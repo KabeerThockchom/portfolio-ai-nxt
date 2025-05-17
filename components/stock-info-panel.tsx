@@ -1,3 +1,5 @@
+import { Badge } from "@/components/ui/badge";
+
 interface StockInfoPanelProps {
   stock: string
   chartData: any
@@ -22,23 +24,31 @@ export default function StockInfoPanel({ stock, chartData }: StockInfoPanelProps
 
     return (
       <>
-        <InfoCard title="Current Price" value={`$${meta.regularMarketPrice?.toFixed(2) || "N/A"}`} />
-        <InfoCard
-          title="Change"
-          value={`${changeSign}$${change.toFixed(2)} (${changeSign}${changePercent.toFixed(2)}%)`}
-          cssClass={cssClass}
-        />
-        <InfoCard
-          title="Day Range"
-          value={`$${meta.regularMarketDayLow?.toFixed(2) || "N/A"} - $${meta.regularMarketDayHigh?.toFixed(2) || "N/A"}`}
-        />
-        <InfoCard
-          title="52 Week Range"
-          value={`$${meta.fiftyTwoWeekLow?.toFixed(2) || "N/A"} - $${meta.fiftyTwoWeekHigh?.toFixed(2) || "N/A"}`}
-        />
-        <InfoCard title="Volume" value={`${meta.regularMarketVolume?.toLocaleString() || "N/A"}`} />
-        <InfoCard title="Previous Close" value={`$${meta.chartPreviousClose?.toFixed(2) || "N/A"}`} />
-        <InfoCard title="Exchange" value={meta.exchangeName || "N/A"} />
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <InfoCard title="Current Price" value={`$${meta.regularMarketPrice?.toFixed(2) || "N/A"}`} />
+          <InfoCard
+            title="Change"
+            value={`${changeSign}$${change.toFixed(2)} (${changeSign}${changePercent.toFixed(2)}%)`}
+            cssClass={cssClass}
+          />
+          <InfoCard
+            title="Day Range"
+            value={`$${meta.regularMarketDayLow?.toFixed(2) || "N/A"} - $${meta.regularMarketDayHigh?.toFixed(2) || "N/A"}`}
+          />
+          <InfoCard
+            title="52 Week Range"
+            value={`$${meta.fiftyTwoWeekLow?.toFixed(2) || "N/A"} - $${meta.fiftyTwoWeekHigh?.toFixed(2) || "N/A"}`}
+          />
+          <InfoCard title="Volume" value={`${meta.regularMarketVolume?.toLocaleString() || "N/A"}`} />
+          <InfoCard title="Previous Close" value={`$${meta.chartPreviousClose?.toFixed(2) || "N/A"}`} />
+        </div>
+        {meta.exchangeName && (
+          <div className="col-span-2 sm:col-span-3 mt-2 flex justify-start sm:justify-center">
+            <Badge variant="outline" className="px-2 py-0.5 text-xs bg-muted text-muted-foreground border-muted-foreground/30">
+              Exchange: {meta.exchangeName}
+            </Badge>
+          </div>
+        )}
       </>
     )
   }
@@ -91,7 +101,7 @@ export default function StockInfoPanel({ stock, chartData }: StockInfoPanelProps
     }
 
     return (
-      <>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <InfoCard title="Current Price" value={`$${currentPrice?.toFixed(2) || "N/A"}`} />
         <InfoCard title="Change" value={changeText} cssClass={cssClass} />
         <InfoCard title="Previous Close" value={`$${prevClose?.toFixed(2) || "N/A"}`} />
@@ -99,7 +109,7 @@ export default function StockInfoPanel({ stock, chartData }: StockInfoPanelProps
         <InfoCard title="Period Low" value={periodLow} />
         <InfoCard title="Symbol" value={stock} />
         <InfoCard title="Chart Period" value={result.meta.range || "N/A"} />
-      </>
+      </div>
     )
   }
 }
@@ -112,9 +122,9 @@ interface InfoCardProps {
 
 function InfoCard({ title, value, cssClass = "" }: InfoCardProps) {
   return (
-    <div className="info-card p-4 bg-muted rounded-lg">
-      <h3 className="text-sm font-medium mb-1">{title}</h3>
-      <p className={`text-lg font-semibold ${cssClass}`}>{value}</p>
+    <div className="info-card p-2 bg-muted rounded-lg">
+      <h3 className="text-xs font-medium mb-0 text-muted-foreground leading-tight">{title}</h3>
+      <p className={`text-sm font-semibold ${cssClass}`}>{value}</p>
     </div>
   )
 }

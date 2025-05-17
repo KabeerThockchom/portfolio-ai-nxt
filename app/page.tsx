@@ -503,10 +503,10 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-background flex flex-col overflow-x-hidden">
-      <div className="container mx-auto px-4 py-8 flex-grow">
-        <header className="mb-8 flex justify-between items-center">
+      <div className="container mx-auto px-4 py-4 flex-grow">
+        <header className="mb-4 flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold mb-2">EY Portfolio AI</h1>
+            <h1 className="text-3xl font-bold mb-1">EY Portfolio AI</h1>
             <p className="text-muted-foreground">
               Voice-enabled AI assistant for financial insights and stock analysis
             </p>
@@ -522,8 +522,8 @@ export default function Home() {
               }`}
             >
               <Card className="border-secondary">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
                     <h2 className="text-xl font-semibold">Stock Visualization</h2>
                     <div className="flex items-center gap-2">
                       <select
@@ -577,22 +577,22 @@ export default function Home() {
                     </div>
                   )}
 
-                  <div id="chartContainer" className={`w-full min-h-[350px] ${chartData && !isLoading ? "visible" : "hidden"}`}>
+                  <div id="chartContainer" className={`w-full min-h-[260px] ${chartData && !isLoading ? "visible" : "hidden"}`}>
                     {chartData && !isLoading && <StockChart chartData={chartData} symbol={selectedStock} viewMode={currentChartView} />}
                     <div className="legend-container flex flex-wrap gap-2 mt-2"></div>
                   </div>
 
                   {!chartData && !isLoading && (
-                    <div className="flex flex-col items-center justify-center h-[350px] border border-dashed rounded-lg border-secondary">
-                      <BarChart4 className="w-12 h-12 text-muted-foreground mb-2" />
-                      <p className="text-muted-foreground">Ask the assistant to show you a stock chart</p>
+                    <div className="flex flex-col items-center justify-center h-[260px] border border-dashed rounded-lg border-secondary">
+                      <BarChart4 className="w-10 h-10 text-muted-foreground mb-2" />
+                      <p className="text-muted-foreground text-sm">Ask the assistant to show you a stock chart</p>
                     </div>
                   )}
 
                   {isLoading && (
-                    <div id="loadingIndicator" className="flex flex-col items-center justify-center h-[350px]">
-                      <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
-                      <p className="text-muted-foreground">Loading chart data...</p>
+                    <div id="loadingIndicator" className="flex flex-col items-center justify-center h-[260px]">
+                      <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
+                      <p className="text-muted-foreground text-sm">Loading chart data...</p>
                     </div>
                   )}
                 </CardContent>
@@ -607,16 +607,16 @@ export default function Home() {
               }`}
             >
               <Card className="border-secondary">
-                <CardContent className="p-6">
-                  <h2 className="text-xl font-semibold mb-4">Stock Information</h2>
+                <CardContent className="p-4">
+                  <h2 className="text-xl font-semibold mb-3">Stock Information</h2>
                   {chartData && chartData.chart && chartData.chart.result && chartData.chart.result.length > 0 && selectedStock ? (
                     <div className="grid grid-cols-1 gap-4">
                       <StockInfoPanel stock={selectedStock} chartData={chartData} />
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center h-[350px] border border-dashed rounded-lg border-secondary">
-                      <Info className="w-12 h-12 text-muted-foreground mb-2" />
-                      <p className="text-muted-foreground text-center">
+                    <div className="flex flex-col items-center justify-center h-[260px] border border-dashed rounded-lg border-secondary">
+                      <Info className="w-10 h-10 text-muted-foreground mb-2" />
+                      <p className="text-muted-foreground text-center text-sm">
                         Select a stock or ask the assistant for details.
                       </p>
                     </div>
@@ -627,14 +627,14 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="mt-12 py-6 flex flex-col items-center">
+        <div className="mt-6 py-3 flex flex-col items-center">
           {chartHistory.length > 1 && (
-            <div className="flex justify-center space-x-2 mb-3">
+            <div className="flex justify-center space-x-2 mb-2">
               {chartHistory.map((_, index) => (
                 <button 
                   key={`dot-${index}`} 
                   onClick={() => navigateToHistory(index)}
-                  className={`h-3 w-3 rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-1 focus:ring-yellow-500/70 ${
+                  className={`h-2.5 w-2.5 rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-1 focus:ring-yellow-500/70 ${
                     currentHistoryIndex === index ? 'bg-yellow-400 scale-110' : 'bg-muted hover:bg-muted-foreground/50'
                   }`}
                   aria-label={`View chart ${index + 1}`}
@@ -642,7 +642,7 @@ export default function Home() {
               ))}
             </div>
           )}
-          <div className="flex flex-col items-center justify-center mb-2.5 min-h-[6rem] md:min-h-[7rem]">
+          <div className="flex flex-col items-center justify-center mb-2 min-h-[4.5rem] md:min-h-[5.5rem]">
             <AudioSphereVisualizer 
               isAssistantListening={isListening}
               llmAudioElementRef={audioElementRef}
