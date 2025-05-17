@@ -8,6 +8,7 @@ import StockInfoPanel from "@/components/stock-info-panel"
 import { useToast } from "@/hooks/use-toast"
 import StockChart from "@/components/stock-chart"
 import { ThemeToggle } from "@/components/theme-toggle"
+import TypewriterBadges from "@/components/ui/typewriter-badges"
 
 // Define types for chartData
 interface ChartMeta {
@@ -54,6 +55,22 @@ interface ApiStockChartResponse {
 // Define the type for the dynamically imported module
 type RtcHelpersModule = typeof import('@/lib/webrtc-helpers');
 
+// Interface for chart history item
+interface ChartHistoryItem {
+  chartData: ChartData;
+  mainStock: string;
+  selectedStock: string;
+  comparisonStocks: string[];
+  viewMode: "price" | "percent" | "relative";
+}
+
+const examplePrompts = [
+  "Show me chart for apple for the last year",
+  "Compare TSLA with F and GM",
+  "Key stats for MSFT?",
+  "AMZN 6 month chart",
+];
+
 export default function Home() {
   const [isListening, setIsListening] = useState(false)
   const [rapidApiKey, setRapidApiKey] = useState("")
@@ -63,12 +80,17 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [rtcHelpers, setRtcHelpers] = useState<RtcHelpersModule | null>(null);
+  const [showComponents, setShowComponents] = useState(false);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
   const dataChannelRef = useRef<RTCDataChannel | null>(null)
   const audioElementRef = useRef<HTMLAudioElement | null>(null)
   const [currentChartView, setCurrentChartView] = useState<"price" | "percent" | "relative">("price")
   const [mainStock, setMainStock] = useState("")
+
+  // State for chart history carousel
+  const [chartHistory, setChartHistory] = useState<ChartHistoryItem[]>([]);
+  const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
 
   const { toast } = useToast()
 
@@ -174,18 +196,39 @@ export default function Home() {
 
       if (msg.name === "getStockChart") {
         setIsLoading(true)
+        setShowComponents(false);
         apiResponse = await fetchStockChart(args)
         if (apiResponse.success && apiResponse.chartData) {
-          setChartData(apiResponse.chartData)
-          setMainStock(args.symbol)
-          setSelectedStock(args.symbol)
-          if (args.comparisons) {
-            setComparisonStocks(args.comparisons.split(",").map((s: string) => s.trim()))
-          } else {
-            setComparisonStocks([])
-          }
-        } else if (apiResponse && !apiResponse.success) { // Check apiResponse exists
+          const newChartData = apiResponse.chartData;
+          const newMainStock = args.symbol;
+          const newSelectedStock = args.symbol;
+          const newComparisonStocks = args.comparisons ? args.comparisons.split(",").map((s: string) => s.trim()) : [];
+          // Assuming currentChartView is already updated or use a default/arg
+
+          setChartData(newChartData);
+          setMainStock(newMainStock);
+          setSelectedStock(newSelectedStock);
+          setComparisonStocks(newComparisonStocks);
+
+          // Add to history
+          setChartHistory(prevHistory => {
+            const newEntry: ChartHistoryItem = {
+              chartData: newChartData,
+              mainStock: newMainStock,
+              selectedStock: newSelectedStock,
+              comparisonStocks: newComparisonStocks,
+              viewMode: currentChartView, // Capture current view mode
+            };
+            // Simple history: add to end, could be improved (e.g., limit size)
+            const updatedHistory = [...prevHistory, newEntry];
+            setCurrentHistoryIndex(updatedHistory.length - 1);
+            return updatedHistory;
+          });
+
+          setTimeout(() => setShowComponents(true), 100);
+        } else if (apiResponse && !apiResponse.success) {
           toast({ title: "Error fetching chart", description: apiResponse.error, variant: "destructive" });
+          setChartData(null);
         }
         setIsLoading(false)
       } else if (msg.name === "getStockProfile") {
@@ -403,18 +446,66 @@ export default function Home() {
       audioElementRef.current.srcObject = null
     }
     setIsListening(false)
-    toast({
-      title: "Assistant Stopped",
-      description: "Voice assistant has been disconnected.",
-    })
-  }, [toast]);
+  }, []);
+
+  const handlePromptClick = (prompt: string) => {
+    if (!isListening) {
+      startAssistant().then(() => {
+        // TODO: Find a reliable way to send the prompt after assistant is fully ready
+        // This might require a more complex state management or event system
+        // For now, we can try sending after a short delay, but it's not guaranteed
+        setTimeout(() => {
+          if (dataChannelRef.current && dataChannelRef.current.readyState === 'open') {
+            const event = {
+              type: "conversation.item.create",
+              item: { type: "text_input", text: prompt },
+            };
+            dataChannelRef.current.send(JSON.stringify(event));
+            dataChannelRef.current.send(JSON.stringify({ type: "response.create" }));
+            toast({ title: "Prompt Sent", description: `Sent: "${prompt}"` });
+          } else {
+            toast({ title: "Assistant Not Ready", description: "Could not send prompt. Please try again.", variant: "destructive"});
+          }
+        }, 1500); // Delay to allow assistant to initialize
+      });
+    } else if (dataChannelRef.current && dataChannelRef.current.readyState === 'open') {
+      const event = {
+        type: "conversation.item.create",
+        item: { type: "text_input", text: prompt },
+      };
+      dataChannelRef.current.send(JSON.stringify(event));
+      dataChannelRef.current.send(JSON.stringify({ type: "response.create" }));
+      toast({ title: "Prompt Sent", description: `Sent: "${prompt}"` });
+    } else {
+        toast({ title: "Assistant Not Ready", description: "Could not send prompt. Please try again.", variant: "destructive"});
+    }
+  };
+
+  // Function to navigate chart history
+  const navigateToHistory = (index: number) => {
+    if (index >= 0 && index < chartHistory.length) {
+      setShowComponents(false); // Hide components to re-trigger animation
+      const historyItem = chartHistory[index];
+      
+      // Delay state updates slightly to allow UI to register showComponents = false
+      setTimeout(() => {
+        setChartData(historyItem.chartData);
+        setMainStock(historyItem.mainStock);
+        setSelectedStock(historyItem.selectedStock);
+        setComparisonStocks(historyItem.comparisonStocks);
+        setCurrentChartView(historyItem.viewMode);
+        setCurrentHistoryIndex(index);
+        setShowComponents(true); // Show components to trigger animation
+      }, 50); // Small delay, adjust if needed
+    }
+  };
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
+    <main className="min-h-screen bg-background flex flex-col">
+      <div className="container mx-auto px-4 py-8 flex-grow">
         <header className="mb-8 flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Portfolio Assistant</h1>
+            <h1 className="text-3xl font-bold mb-2">EY Portfolio AI</h1>
             <p className="text-muted-foreground">
               Voice-enabled AI assistant for financial insights and stock analysis
             </p>
@@ -422,142 +513,175 @@ export default function Home() {
           <ThemeToggle />
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden pb-40">
           <div className="lg:col-span-2">
-            <Card className="mb-6 border-secondary">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold">Stock Visualization</h2>
-                  <div className="flex items-center gap-2">
-                    <select
-                      id="chartView"
-                      className="px-3 py-2 rounded-md border border-input bg-background text-foreground"
-                      value={currentChartView}
-                      onChange={(e) => setCurrentChartView(e.target.value as "price" | "percent" | "relative")}
-                    >
-                      <option value="price">Price</option>
-                      <option value="percent">Percent Change</option>
-                      <option value="relative">Relative Performance</option>
-                    </select>
-                  </div>
-                </div>
-
-                {chartData && chartData.chart && chartData.chart.result && chartData.chart.result.length > 0 && (
-                  <div className="flex flex-wrap justify-between items-center mb-4 text-sm">
-                    <div className="bg-muted px-3 py-1 rounded-md">
-                      <span className="font-medium">Interval:</span>{" "}
-                      {chartData.chart.result[0].meta.dataGranularity || "1d"}
-                    </div>
-                    <div className="bg-muted px-3 py-1 rounded-md">
-                      <span className="font-medium">Range:</span> {chartData.chart.result[0].meta.range || "1mo"}
-                    </div>
-                  </div>
-                )}
-
-                {mainStock && (
-                  <div id="stockSelector" className="flex flex-wrap gap-2 mb-4">
-                    <Button
-                      variant={selectedStock === mainStock ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedStock(mainStock)}
-                      className="bg-primary text-primary-foreground hover:bg-primary/90"
-                    >
-                      {mainStock}
-                    </Button>
-                    {comparisonStocks.map((symbol) => (
-                      <Button
-                        key={symbol}
-                        variant={selectedStock === symbol ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setSelectedStock(symbol)}
-                        className={
-                          selectedStock === symbol ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""
-                        }
+            <div
+              className={`transition-all duration-700 ease-out ${
+                showComponents && chartData ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1/2"
+              }`}
+            >
+              <Card className="mb-6 border-secondary">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold">Stock Visualization</h2>
+                    <div className="flex items-center gap-2">
+                      <select
+                        id="chartView"
+                        className="px-3 py-2 rounded-md border border-input bg-background text-foreground"
+                        value={currentChartView}
+                        onChange={(e) => setCurrentChartView(e.target.value as "price" | "percent" | "relative")}
                       >
-                        {symbol}
-                      </Button>
-                    ))}
+                        <option value="price">Price</option>
+                        <option value="percent">Percent Change</option>
+                        <option value="relative">Relative Performance</option>
+                      </select>
+                    </div>
                   </div>
-                )}
 
-                <div id="chartContainer" className={`w-full h-[350px] ${chartData ? "visible" : "hidden"}`}>
-                  {chartData && <StockChart chartData={chartData} symbol={selectedStock} viewMode={currentChartView} />}
-                  <div className="legend-container flex flex-wrap gap-2 mt-2"></div>
-                </div>
-
-                {!chartData && !isLoading && (
-                  <div className="flex flex-col items-center justify-center h-[350px] border border-dashed rounded-lg border-secondary">
-                    <BarChart4 className="w-12 h-12 text-muted-foreground mb-2" />
-                    <p className="text-muted-foreground">Ask the assistant to show you a stock chart</p>
-                  </div>
-                )}
-
-                {isLoading && (
-                  <div id="loadingIndicator" className="flex flex-col items-center justify-center h-[350px]">
-                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
-                    <p className="text-muted-foreground">Loading chart data...</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="border-secondary">
-              <CardContent className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Stock Information</h2>
-                <div id="stockInfoPanel" className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {selectedStock ? (
-                    <StockInfoPanel stock={selectedStock} chartData={chartData} />
-                  ) : (
-                    <div className="col-span-3 flex flex-col items-center justify-center h-[200px] border border-dashed rounded-lg border-secondary">
-                      <Info className="w-12 h-12 text-muted-foreground mb-2" />
-                      <p className="text-muted-foreground">Select a stock to view detailed information</p>
+                  {chartData && chartData.chart && chartData.chart.result && chartData.chart.result.length > 0 && (
+                    <div className="flex flex-wrap justify-between items-center mb-4 text-sm">
+                      <div className="bg-muted px-3 py-1 rounded-md">
+                        <span className="font-medium">Interval:</span>{" "}
+                        {chartData.chart.result[0].meta.dataGranularity || "1d"}
+                      </div>
+                      <div className="bg-muted px-3 py-1 rounded-md">
+                        <span className="font-medium">Range:</span> {chartData.chart.result[0].meta.range || "1mo"}
+                      </div>
                     </div>
                   )}
-                </div>
-              </CardContent>
-            </Card>
+
+                  {mainStock && (
+                    <div id="stockSelector" className="flex flex-wrap gap-2 mb-4">
+                      <Button
+                        variant={selectedStock === mainStock ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSelectedStock(mainStock)}
+                        className="bg-primary text-primary-foreground hover:bg-primary/90"
+                      >
+                        {mainStock}
+                      </Button>
+                      {comparisonStocks.map((symbol) => (
+                        <Button
+                          key={symbol}
+                          variant={selectedStock === symbol ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setSelectedStock(symbol)}
+                          className={
+                            selectedStock === symbol ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""
+                          }
+                        >
+                          {symbol}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+
+                  <div id="chartContainer" className={`w-full min-h-[350px] ${chartData && !isLoading ? "visible" : "hidden"}`}>
+                    {chartData && !isLoading && <StockChart chartData={chartData} symbol={selectedStock} viewMode={currentChartView} />}
+                    <div className="legend-container flex flex-wrap gap-2 mt-2"></div>
+                  </div>
+
+                  {!chartData && !isLoading && (
+                    <div className="flex flex-col items-center justify-center h-[350px] border border-dashed rounded-lg border-secondary">
+                      <BarChart4 className="w-12 h-12 text-muted-foreground mb-2" />
+                      <p className="text-muted-foreground">Ask the assistant to show you a stock chart</p>
+                    </div>
+                  )}
+
+                  {isLoading && (
+                    <div id="loadingIndicator" className="flex flex-col items-center justify-center h-[350px]">
+                      <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
+                      <p className="text-muted-foreground">Loading chart data...</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
-          <div>
-            <Card className="mb-6 border-secondary">
-              <CardContent className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Voice Assistant</h2>
-                <div className="flex flex-col items-center">
-                  <Button
-                    size="lg"
-                    className={`w-16 h-16 rounded-full mb-4 ${
-                      isListening ? "bg-primary hover:bg-primary/90" : "bg-primary hover:bg-primary/90"
-                    }`}
-                    onClick={mounted && rtcHelpers ? (isListening ? stopAssistant : startAssistant) : undefined}
-                    disabled={!mounted || !rtcHelpers}
-                  >
-                    {isListening ? (
-                      <MicOff className="w-6 h-6 text-primary-foreground" />
-                    ) : (
-                      <Mic className="w-6 h-6 text-primary-foreground" />
-                    )}
-                  </Button>
-                  <p className="text-center mb-4">
-                    {isListening
-                      ? "Assistant is listening. Click to stop."
-                      : mounted && rtcHelpers 
-                      ? "Click to start the voice assistant"
-                      : "Voice assistant initializing..."}
-                  </p>
-                  <audio ref={audioElementRef} autoPlay className="hidden" />
-                </div>
-                <div className="mt-4 p-4 bg-muted rounded-lg">
-                  <h3 className="font-medium mb-2">Try asking:</h3>
-                  <ul className="space-y-2 text-sm">
-                    <li>"Show me Apple's stock chart for the last month"</li>
-                    <li>"Compare Tesla with Ford and GM"</li>
-                    <li>"What are the key statistics for Microsoft?"</li>
-                    <li>"Show me the 6-month chart for Amazon"</li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="lg:col-span-1 space-y-6">
+            <div
+              className={`transition-all duration-700 ease-out delay-200 ${
+                showComponents && chartData ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1/2"
+              }`}
+            >
+              <Card className="border-secondary">
+                <CardContent className="p-6">
+                  <h2 className="text-xl font-semibold mb-4">Stock Information</h2>
+                  {chartData && chartData.chart && chartData.chart.result && chartData.chart.result.length > 0 && selectedStock ? (
+                    <div className="grid grid-cols-1 gap-4">
+                      <StockInfoPanel stock={selectedStock} chartData={chartData} />
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-[350px] border border-dashed rounded-lg border-secondary">
+                      <Info className="w-12 h-12 text-muted-foreground mb-2" />
+                      <p className="text-muted-foreground text-center">
+                        Select a stock or ask the assistant for details.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
+        </div>
+      </div>
+
+      {/* Fixed Voice Assistant Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm shadow-lg">
+        <div className="container mx-auto px-4 py-3 flex flex-col items-center">
+          
+          {/* Carousel Dots - only show if history exists and more than one item */}
+          {chartHistory.length > 1 && (
+            <div className="flex justify-center space-x-2 mb-3">
+              {chartHistory.map((_, index) => (
+                <button 
+                  key={`dot-${index}`} 
+                  onClick={() => navigateToHistory(index)}
+                  className={`h-3 w-3 rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-1 focus:ring-yellow-500/70 ${
+                    currentHistoryIndex === index ? 'bg-yellow-400 scale-110' : 'bg-muted hover:bg-muted-foreground/50'
+                  }`}
+                  aria-label={`View chart ${index + 1}`}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Mic Button and Status */}
+          <div className="flex flex-col items-center space-y-1 mb-2.5">
+            <Button
+              size="lg"
+              className={`w-16 h-16 rounded-full transition-all duration-300 ease-in-out
+                ${
+                  isListening
+                    ? "bg-yellow-400 hover:bg-yellow-500 scale-105 shadow-md ring-2 ring-yellow-400/50 text-black"
+                    : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                }`}
+              onClick={mounted && rtcHelpers ? (isListening ? stopAssistant : startAssistant) : undefined}
+              disabled={!mounted || !rtcHelpers}
+            >
+              {isListening ? (
+                <MicOff className="w-7 h-7" />
+              ) : (
+                <Mic className="w-7 h-7" />
+              )}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              {isListening
+                ? "Listening..."
+                : mounted && rtcHelpers
+                ? "Tap to speak"
+                : "Initializing..."}
+            </p>
+          </div>
+          
+          <audio ref={audioElementRef} autoPlay className="hidden" />
+          <TypewriterBadges 
+            prompts={examplePrompts} 
+            onBadgeClick={handlePromptClick} 
+            containerClassName="w-full flex flex-col items-center" 
+            badgeClassName="bg-muted/70 hover:bg-muted text-muted-foreground cursor-pointer transition-colors text-xs py-1 px-2.5"
+          />
         </div>
       </div>
     </main>
