@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast"
 import StockChart from "@/components/stock-chart"
 import { ThemeToggle } from "@/components/theme-toggle"
 import TypewriterBadges from "@/components/ui/typewriter-badges"
+import AudioSphereVisualizer from "@/components/ui/audio-sphere-visualizer"
 
 // Define types for chartData
 interface ChartMeta {
@@ -65,10 +66,10 @@ interface ChartHistoryItem {
 }
 
 const examplePrompts = [
-  "Show me chart for apple for the last year",
-  "Compare TSLA with F and GM",
-  "Key stats for MSFT?",
-  "AMZN 6 month chart",
+  "How did AAPL do the last 3 months?",
+  "Compare Tesla to Ford and GM",
+  "Key stats for Microsoft?",
+  "Amazon's stock price last 5 years",
 ];
 
 export default function Home() {
@@ -501,7 +502,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-background flex flex-col">
+    <main className="min-h-screen bg-background flex flex-col overflow-x-hidden">
       <div className="container mx-auto px-4 py-8 flex-grow">
         <header className="mb-8 flex justify-between items-center">
           <div>
@@ -513,14 +514,14 @@ export default function Home() {
           <ThemeToggle />
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden pb-40">
-          <div className="lg:col-span-2">
+        <div className="space-y-6">
+          <div>
             <div
               className={`transition-all duration-700 ease-out ${
                 showComponents && chartData ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1/2"
               }`}
             >
-              <Card className="mb-6 border-secondary">
+              <Card className="border-secondary">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-semibold">Stock Visualization</h2>
@@ -599,7 +600,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="lg:col-span-1 space-y-6">
+          <div>
             <div
               className={`transition-all duration-700 ease-out delay-200 ${
                 showComponents && chartData ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1/2"
@@ -625,13 +626,8 @@ export default function Home() {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Fixed Voice Assistant Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm shadow-lg">
-        <div className="container mx-auto px-4 py-3 flex flex-col items-center">
-          
-          {/* Carousel Dots - only show if history exists and more than one item */}
+        <div className="mt-12 py-6 flex flex-col items-center">
           {chartHistory.length > 1 && (
             <div className="flex justify-center space-x-2 mb-3">
               {chartHistory.map((_, index) => (
@@ -646,40 +642,27 @@ export default function Home() {
               ))}
             </div>
           )}
-
-          {/* Mic Button and Status */}
-          <div className="flex flex-col items-center space-y-1 mb-2.5">
-            <Button
-              size="lg"
-              className={`w-16 h-16 rounded-full transition-all duration-300 ease-in-out
-                ${
-                  isListening
-                    ? "bg-yellow-400 hover:bg-yellow-500 scale-105 shadow-md ring-2 ring-yellow-400/50 text-black"
-                    : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                }`}
-              onClick={mounted && rtcHelpers ? (isListening ? stopAssistant : startAssistant) : undefined}
-              disabled={!mounted || !rtcHelpers}
-            >
-              {isListening ? (
-                <MicOff className="w-7 h-7" />
-              ) : (
-                <Mic className="w-7 h-7" />
-              )}
-            </Button>
-            <p className="text-xs text-muted-foreground">
+          <div className="flex flex-col items-center justify-center mb-2.5 min-h-[6rem] md:min-h-[7rem]">
+            <AudioSphereVisualizer 
+              isAssistantListening={isListening}
+              llmAudioElementRef={audioElementRef}
+              onStartAssistant={startAssistant}
+              onStopAssistant={stopAssistant}
+              canvasClassName="w-16 h-16 md:w-20 md:h-20 cursor-pointer" 
+            />
+            <p className="text-xs text-muted-foreground mt-1">
               {isListening
-                ? "Listening..."
+                ? "Tap me to mute"
                 : mounted && rtcHelpers
-                ? "Tap to speak"
+                ? "Tap me to speak"
                 : "Initializing..."}
             </p>
           </div>
-          
           <audio ref={audioElementRef} autoPlay className="hidden" />
           <TypewriterBadges 
             prompts={examplePrompts} 
             onBadgeClick={handlePromptClick} 
-            containerClassName="w-full flex flex-col items-center" 
+            containerClassName="w-full flex flex-col items-center mt-3" 
             badgeClassName="bg-muted/70 hover:bg-muted text-muted-foreground cursor-pointer transition-colors text-xs py-1 px-2.5"
           />
         </div>
