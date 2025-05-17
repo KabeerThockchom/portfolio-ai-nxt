@@ -514,7 +514,7 @@ export default function Home() {
           <ThemeToggle />
         </header>
 
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div>
             <div
               className={`transition-all duration-700 ease-out ${
@@ -627,7 +627,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="mt-6 py-3 flex flex-col items-center">
+        <div className="mt-4 py-3 flex flex-col items-center">
           {chartHistory.length > 1 && (
             <div className="flex justify-center space-x-2 mb-2">
               {chartHistory.map((_, index) => (
