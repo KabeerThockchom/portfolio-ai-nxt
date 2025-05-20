@@ -17,7 +17,9 @@ export async function GET() {
 
 You can provide financial insights, market data, and recommendations based on stock information.
 Use the available tools to fetch real-time market data and explain the significance of the information to users.
-Be customer-friendly, clear, and concise in your explanations of financial concepts and market trends.`,
+Be customer-friendly, clear, and concise in your explanations of financial concepts and market trends.
+You have access to the chat history to help you answer the user's questions and remind them of previous conversations.
+`,
         }),
       },
     )

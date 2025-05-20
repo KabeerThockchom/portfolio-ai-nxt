@@ -92,6 +92,11 @@ export default function Home() {
   // State for chart history carousel
   const [chartHistory, setChartHistory] = useState<ChartHistoryItem[]>([]);
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
+  const [llmResponseHistory, setLlmResponseHistory] = useState<string[]>([]);
+  const [currentLlmMessage, setCurrentLlmMessage] = useState<string>("");
+  const [isChatVisible, setIsChatVisible] = useState(true);
+  // Add a ref to track the last message content for deduplication
+  const lastMessageRef = useRef<string>("");
 
   const { toast } = useToast()
 
@@ -371,7 +376,36 @@ export default function Home() {
       dataChannel.addEventListener("message", async (ev) => {
         const msg = JSON.parse(ev.data);
         if (msg.type === "response.function_call_arguments.done") {
-          handleFunctionCall(msg, dataChannel); // Now defined above
+          handleFunctionCall(msg, dataChannel);
+        } else if (msg.type === "response.text.delta" || msg.type === "response.audio_transcript.delta") {
+          if (msg.delta) {
+            // Only update current message - don't add to history yet
+            setCurrentLlmMessage(prevText => prevText + msg.delta);
+          }
+        } else if (msg.type === "response.text.done" || msg.type === "response.audio_transcript.done") {
+          // Complete the current message
+          setCurrentLlmMessage(current => {
+            const finalMessage = current + (msg.delta || "");
+            
+            // Store this in our ref for deduplication
+            lastMessageRef.current = finalMessage;
+            
+            // Only add to history if it's not empty
+            if (finalMessage.trim()) {
+              // Add to history using the functional update to avoid race conditions
+              setLlmResponseHistory(prevHistory => {
+                // Check if this message is already in history to prevent duplicates
+                if (prevHistory.length > 0 && prevHistory[prevHistory.length - 1] === finalMessage) {
+                  // Message already exists, don't add again
+                  return prevHistory;
+                }
+                return [...prevHistory, finalMessage];
+              });
+            }
+            
+            // Clear the current message since it's now in history
+            return "";
+          });
         }
       });
 
@@ -452,9 +486,6 @@ export default function Home() {
   const handlePromptClick = (prompt: string) => {
     if (!isListening) {
       startAssistant().then(() => {
-        // TODO: Find a reliable way to send the prompt after assistant is fully ready
-        // This might require a more complex state management or event system
-        // For now, we can try sending after a short delay, but it's not guaranteed
         setTimeout(() => {
           if (dataChannelRef.current && dataChannelRef.current.readyState === 'open') {
             const event = {
@@ -467,7 +498,7 @@ export default function Home() {
           } else {
             toast({ title: "Assistant Not Ready", description: "Could not send prompt. Please try again.", variant: "destructive"});
           }
-        }, 1500); // Delay to allow assistant to initialize
+        }, 1500);
       });
     } else if (dataChannelRef.current && dataChannelRef.current.readyState === 'open') {
       const event = {
@@ -488,7 +519,6 @@ export default function Home() {
       setShowComponents(false); // Hide components to re-trigger animation
       const historyItem = chartHistory[index];
       
-      // Delay state updates slightly to allow UI to register showComponents = false
       setTimeout(() => {
         setChartData(historyItem.chartData);
         setMainStock(historyItem.mainStock);
@@ -659,6 +689,45 @@ export default function Home() {
             </p>
           </div>
           <audio ref={audioElementRef} autoPlay className="hidden" />
+
+          {/* New Chat Panel */}
+          <div className="w-full max-w-2xl mx-auto mt-4">
+            <div className="flex justify-end mb-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsChatVisible(!isChatVisible)}
+                aria-label={isChatVisible ? "Minimize chat" : "Maximize chat"}
+              >
+                {isChatVisible ? "Minimize" : "Show Transcript"}
+              </Button>
+            </div>
+            <div
+              className={`transition-all duration-300 ease-in-out overflow-hidden rounded-lg border border-secondary bg-card shadow-sm ${
+                isChatVisible ? "max-h-60" : "max-h-0"
+              }`}
+            >
+              <CardContent className="p-4 h-full">
+                <div className="h-full overflow-y-auto space-y-2">
+                  {llmResponseHistory.map((text, index) => (
+                    <div key={index} className="text-sm text-muted-foreground p-2 bg-muted/50 rounded-md">
+                      {text}
+                    </div>
+                  ))}
+                  {/* Only show current message if it's not already in history */}
+                  {currentLlmMessage && (
+                    <div className="text-sm text-foreground p-2 bg-primary/10 rounded-md animate-pulse">
+                      {currentLlmMessage}
+                    </div>
+                  )}
+                  {(llmResponseHistory.length === 0 && !currentLlmMessage) && (
+                     <p className="text-xs text-muted-foreground text-center">Assistant responses will appear here.</p>
+                  )}
+                </div>
+              </CardContent>
+            </div>
+          </div>
+
           <TypewriterBadges 
             prompts={examplePrompts} 
             onBadgeClick={handlePromptClick} 
