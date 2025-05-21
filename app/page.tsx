@@ -651,7 +651,7 @@ export default function Home() {
     <main className="min-h-screen bg-background flex flex-col overflow-hidden">
       <header className="border-b border-border py-3 px-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold flex items-center">
-          EY Portfolio A<span className="relative">I
+          Portfolio A<span className="relative">I
           <AutoAwesomeIcon className="absolute -top-2 -right-4 h-2 w-2" />
           </span>
         </h1>
