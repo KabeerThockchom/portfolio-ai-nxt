@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Mic, MicOff, BarChart4, Info } from "lucide-react"
+import { Mic, MicOff, BarChart4, Info, ChevronLeft, ChevronRight } from "lucide-react"
 import StockInfoPanel from "@/components/stock-info-panel"
 import { useToast } from "@/hooks/use-toast"
 import StockChart from "@/components/stock-chart"
@@ -82,6 +82,7 @@ export default function Home() {
   const [mounted, setMounted] = useState(false)
   const [rtcHelpers, setRtcHelpers] = useState<RtcHelpersModule | null>(null);
   const [showComponents, setShowComponents] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
   const dataChannelRef = useRef<RTCDataChannel | null>(null)
@@ -94,7 +95,14 @@ export default function Home() {
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
   const [llmResponseHistory, setLlmResponseHistory] = useState<string[]>([]);
   const [currentLlmMessage, setCurrentLlmMessage] = useState<string>("");
-  const [isChatVisible, setIsChatVisible] = useState(true);
+  
+  // Animation direction state
+  const [slideDirection, setSlideDirection] = useState<'none' | 'left' | 'right'>('none');
+  
+  // Touch handling for swipe gestures
+  const touchStartXRef = useRef<number | null>(null);
+  const mainContentRef = useRef<HTMLDivElement>(null);
+
   // Add a ref to track the last message content for deduplication
   const lastMessageRef = useRef<string>("");
 
@@ -516,6 +524,15 @@ export default function Home() {
   // Function to navigate chart history
   const navigateToHistory = (index: number) => {
     if (index >= 0 && index < chartHistory.length) {
+      // Determine slide direction based on index change
+      if (index > currentHistoryIndex) {
+        setSlideDirection('left'); // Newer chart, slide from right to left
+      } else if (index < currentHistoryIndex) {
+        setSlideDirection('right'); // Older chart, slide from left to right
+      } else {
+        setSlideDirection('none'); // Same chart, no slide
+      }
+  
       setShowComponents(false); // Hide components to re-trigger animation
       const historyItem = chartHistory[index];
       
@@ -531,29 +548,194 @@ export default function Home() {
     }
   };
 
-  return (
-    <main className="min-h-screen bg-background flex flex-col overflow-x-hidden">
-      <div className="container mx-auto px-4 py-4 flex-grow">
-        <header className="mb-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold mb-1">EY Portfolio AI</h1>
-            <p className="text-muted-foreground">
-              Voice-enabled AI assistant for financial insights and stock analysis
-            </p>
-          </div>
-          <ThemeToggle />
-        </header>
+  // Handle navigation to previous chart
+  const navigateToPrevious = useCallback(() => {
+    if (currentHistoryIndex > 0) {
+      navigateToHistory(currentHistoryIndex - 1);
+    }
+  }, [currentHistoryIndex]);
 
-        <div className="space-y-4">
-          <div>
+  // Handle navigation to next chart
+  const navigateToNext = useCallback(() => {
+    if (currentHistoryIndex < chartHistory.length - 1) {
+      navigateToHistory(currentHistoryIndex + 1);
+    }
+  }, [currentHistoryIndex, chartHistory.length]);
+
+  // Touch event handlers for swipe gestures
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || chartHistory.length <= 1) return;
+    
+    const touchEndX = e.changedTouches[0].clientX;
+    const diffX = touchEndX - touchStartXRef.current;
+    
+    // Minimum swipe distance threshold (adjust as needed)
+    const minSwipeDistance = 50;
+    
+    if (diffX > minSwipeDistance) {
+      // Swipe right -> Previous chart
+      navigateToPrevious();
+    } else if (diffX < -minSwipeDistance) {
+      // Swipe left -> Next chart
+      navigateToNext();
+    }
+    
+    touchStartXRef.current = null;
+  }, [navigateToPrevious, navigateToNext, chartHistory.length]);
+
+  return (
+    <main className="min-h-screen bg-background flex flex-col overflow-hidden">
+      <header className="border-b border-border py-3 px-4 flex justify-between items-center">
+        <h1 className="text-2xl font-bold">EY Portfolio AI</h1>
+        <ThemeToggle />
+      </header>
+      
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <aside className={`border-r border-border transition-all duration-300 bg-card ${isSidebarCollapsed ? 'w-12' : 'w-80'} flex flex-col`}>
+          <div className="flex justify-end p-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {isSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </Button>
+          </div>
+          
+          {/* Sidebar content */}
+          <div className={`flex-1 flex flex-col p-4 ${isSidebarCollapsed ? 'hidden' : ''}`}>
+            {/* Audio Visualizer */}
+            <div className="flex flex-col items-center justify-center mb-6">
+              <AudioSphereVisualizer 
+                isAssistantListening={isListening}
+                llmAudioElementRef={audioElementRef}
+                onStartAssistant={startAssistant}
+                onStopAssistant={stopAssistant}
+                canvasClassName="w-20 h-20 cursor-pointer" 
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                {isListening
+                  ? "Tap to mute"
+                  : mounted && rtcHelpers
+                  ? "Tap to speak"
+                  : "Initializing..."}
+              </p>
+              <audio ref={audioElementRef} autoPlay className="hidden" />
+            </div>
+            
+            {/* Chat Transcript */}
+            <div className="flex-1 overflow-hidden mb-6">
+              <h3 className="font-medium mb-2">Transcript</h3>
+              <div className="h-[calc(100%-2rem)] overflow-y-auto space-y-2 border border-border rounded-lg p-3">
+                {llmResponseHistory.map((text, index) => (
+                  <div key={index} className="text-sm text-muted-foreground p-2 bg-muted/50 rounded-md">
+                    {text}
+                  </div>
+                ))}
+                {currentLlmMessage && (
+                  <div className="text-sm text-foreground p-2 bg-primary/10 rounded-md animate-pulse">
+                    {currentLlmMessage}
+                  </div>
+                )}
+                {(llmResponseHistory.length === 0 && !currentLlmMessage) && (
+                  <p className="text-xs text-muted-foreground text-center">Assistant responses will appear here.</p>
+                )}
+              </div>
+            </div>
+            
+            {/* Example Prompts */}
+            <div className="mt-auto">
+              <h3 className="font-medium mb-2">Example Prompts</h3>
+              <TypewriterBadges 
+                prompts={examplePrompts} 
+                onBadgeClick={handlePromptClick} 
+                containerClassName="flex flex-col gap-2" 
+                badgeClassName="bg-muted/70 hover:bg-muted text-muted-foreground cursor-pointer transition-colors text-sm py-1.5 px-3 w-full text-left"
+              />
+            </div>
+          </div>
+          
+          {/* Collapsed state only shows icons */}
+          <div className={`flex-1 flex flex-col items-center py-4 ${!isSidebarCollapsed ? 'hidden' : ''}`}>
+            <Button variant="ghost" size="icon" onClick={() => setIsSidebarCollapsed(false)} className="mb-4">
+              <Mic className={`h-5 w-5 ${isListening ? 'text-primary' : 'text-muted-foreground'}`} />
+            </Button>
+          </div>
+        </aside>
+        
+        {/* Main Content */}
+        <div 
+          className="flex-1 overflow-y-auto p-6" 
+          ref={mainContentRef}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div className="max-w-6xl mx-auto space-y-6">
+            {/* Chart History Navigation */}
+            {chartHistory.length > 1 && (
+              <div className="flex items-center justify-center gap-4 mb-4">
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={navigateToPrevious}
+                  disabled={currentHistoryIndex <= 0}
+                  aria-label="Previous chart"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                
+                <div className="flex space-x-2">
+                  {chartHistory.map((_, index) => (
+                    <button 
+                      key={`dot-${index}`} 
+                      onClick={() => navigateToHistory(index)}
+                      className={`h-3 w-3 rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-1 focus:ring-yellow-500/70 ${
+                        currentHistoryIndex === index ? 'bg-yellow-400 scale-110' : 'bg-muted hover:bg-muted-foreground/50'
+                      }`}
+                      aria-label={`View chart ${index + 1}`}
+                    />
+                  ))}
+                </div>
+                
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={navigateToNext}
+                  disabled={currentHistoryIndex >= chartHistory.length - 1}
+                  aria-label="Next chart"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            
+            {/* Stock Visualization Card */}
             <div
               className={`transition-all duration-700 ease-out ${
-                showComponents && chartData ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1/2"
+                showComponents && chartData 
+                  ? "opacity-100 " + 
+                    (slideDirection === 'left' 
+                      ? 'animate-slide-in-from-right' 
+                      : slideDirection === 'right' 
+                        ? 'animate-slide-in-from-left' 
+                        : 'translate-y-0')
+                  : "opacity-0 " + 
+                    (slideDirection === 'left' 
+                      ? 'translate-x-full' 
+                      : slideDirection === 'right' 
+                        ? '-translate-x-full' 
+                        : 'translate-y-8')
               }`}
             >
               <Card className="border-secondary">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-semibold">Stock Visualization</h2>
                     <div className="flex items-center gap-2">
                       <select
@@ -607,20 +789,20 @@ export default function Home() {
                     </div>
                   )}
 
-                  <div id="chartContainer" className={`w-full min-h-[260px] ${chartData && !isLoading ? "visible" : "hidden"}`}>
+                  <div id="chartContainer" className={`w-full min-h-[300px] ${chartData && !isLoading ? "visible" : "hidden"}`}>
                     {chartData && !isLoading && <StockChart chartData={chartData} symbol={selectedStock} viewMode={currentChartView} />}
                     <div className="legend-container flex flex-wrap gap-2 mt-2"></div>
                   </div>
 
                   {!chartData && !isLoading && (
-                    <div className="flex flex-col items-center justify-center h-[260px] border border-dashed rounded-lg border-secondary">
+                    <div className="flex flex-col items-center justify-center h-[300px] border border-dashed rounded-lg border-secondary">
                       <BarChart4 className="w-10 h-10 text-muted-foreground mb-2" />
                       <p className="text-muted-foreground text-sm">Ask the assistant to show you a stock chart</p>
                     </div>
                   )}
 
                   {isLoading && (
-                    <div id="loadingIndicator" className="flex flex-col items-center justify-center h-[260px]">
+                    <div id="loadingIndicator" className="flex flex-col items-center justify-center h-[300px]">
                       <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
                       <p className="text-muted-foreground text-sm">Loading chart data...</p>
                     </div>
@@ -628,17 +810,28 @@ export default function Home() {
                 </CardContent>
               </Card>
             </div>
-          </div>
-
-          <div>
+            
+            {/* Stock Information Card */}
             <div
-              className={`transition-all duration-700 ease-out delay-200 ${
-                showComponents && chartData ? "opacity-100 translate-x-0" : "opacity-0 translate-x-1/2"
+              className={`transition-all duration-700 ease-out delay-10 ${
+                showComponents && chartData 
+                  ? "opacity-100 " + 
+                    (slideDirection === 'left' 
+                      ? 'animate-slide-in-from-right' 
+                      : slideDirection === 'right' 
+                        ? 'animate-slide-in-from-left' 
+                        : 'translate-y-0')
+                  : "opacity-0 " + 
+                    (slideDirection === 'left' 
+                      ? 'translate-x-full' 
+                      : slideDirection === 'right' 
+                        ? '-translate-x-full' 
+                        : 'translate-y-8')
               }`}
             >
               <Card className="border-secondary">
-                <CardContent className="p-4">
-                  <h2 className="text-xl font-semibold mb-3">Stock Information</h2>
+                <CardContent className="p-6">
+                  <h2 className="text-xl font-semibold mb-4">Stock Information</h2>
                   {chartData && chartData.chart && chartData.chart.result && chartData.chart.result.length > 0 && selectedStock ? (
                     <div className="grid grid-cols-1 gap-4">
                       <StockInfoPanel stock={selectedStock} chartData={chartData} />
@@ -655,85 +848,6 @@ export default function Home() {
               </Card>
             </div>
           </div>
-        </div>
-
-        <div className="mt-4 py-3 flex flex-col items-center">
-          {chartHistory.length > 1 && (
-            <div className="flex justify-center space-x-2 mb-2">
-              {chartHistory.map((_, index) => (
-                <button 
-                  key={`dot-${index}`} 
-                  onClick={() => navigateToHistory(index)}
-                  className={`h-2.5 w-2.5 rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-1 focus:ring-yellow-500/70 ${
-                    currentHistoryIndex === index ? 'bg-yellow-400 scale-110' : 'bg-muted hover:bg-muted-foreground/50'
-                  }`}
-                  aria-label={`View chart ${index + 1}`}
-                />
-              ))}
-            </div>
-          )}
-          <div className="flex flex-col items-center justify-center mb-2 min-h-[4.5rem] md:min-h-[5.5rem]">
-            <AudioSphereVisualizer 
-              isAssistantListening={isListening}
-              llmAudioElementRef={audioElementRef}
-              onStartAssistant={startAssistant}
-              onStopAssistant={stopAssistant}
-              canvasClassName="w-16 h-16 md:w-20 md:h-20 cursor-pointer" 
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              {isListening
-                ? "Tap me to mute"
-                : mounted && rtcHelpers
-                ? "Tap me to speak"
-                : "Initializing..."}
-            </p>
-          </div>
-          <audio ref={audioElementRef} autoPlay className="hidden" />
-
-          {/* New Chat Panel */}
-          <div className="w-full max-w-2xl mx-auto mt-4">
-            <div className="flex justify-end mb-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsChatVisible(!isChatVisible)}
-                aria-label={isChatVisible ? "Minimize chat" : "Maximize chat"}
-              >
-                {isChatVisible ? "Minimize" : "Show Transcript"}
-              </Button>
-            </div>
-            <div
-              className={`transition-all duration-300 ease-in-out overflow-hidden rounded-lg border border-secondary bg-card shadow-sm ${
-                isChatVisible ? "max-h-60" : "max-h-0"
-              }`}
-            >
-              <CardContent className="p-4 h-full">
-                <div className="h-full overflow-y-auto space-y-2">
-                  {llmResponseHistory.map((text, index) => (
-                    <div key={index} className="text-sm text-muted-foreground p-2 bg-muted/50 rounded-md">
-                      {text}
-                    </div>
-                  ))}
-                  {/* Only show current message if it's not already in history */}
-                  {currentLlmMessage && (
-                    <div className="text-sm text-foreground p-2 bg-primary/10 rounded-md animate-pulse">
-                      {currentLlmMessage}
-                    </div>
-                  )}
-                  {(llmResponseHistory.length === 0 && !currentLlmMessage) && (
-                     <p className="text-xs text-muted-foreground text-center">Assistant responses will appear here.</p>
-                  )}
-                </div>
-              </CardContent>
-            </div>
-          </div>
-
-          <TypewriterBadges 
-            prompts={examplePrompts} 
-            onBadgeClick={handlePromptClick} 
-            containerClassName="w-full flex flex-col items-center mt-3" 
-            badgeClassName="bg-muted/70 hover:bg-muted text-muted-foreground cursor-pointer transition-colors text-xs py-1 px-2.5"
-          />
         </div>
       </div>
     </main>
