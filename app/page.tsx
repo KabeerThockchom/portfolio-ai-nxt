@@ -650,10 +650,13 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-background flex flex-col overflow-hidden">
       <header className="border-b border-border py-3 px-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">EY Portfolio AI</h1>
+        <h1 className="text-2xl font-bold flex items-center">
+          EY Portfolio A<span className="relative">I
+          <AutoAwesomeIcon className="absolute -top-2 -right-4 h-2 w-2" />
+          </span>
+        </h1>
         <ThemeToggle />
       </header>
-      
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <aside className={`border-r border-border transition-all duration-300 bg-card ${isSidebarCollapsed ? 'w-12' : 'w-80'} flex flex-col`}>
@@ -692,12 +695,8 @@ export default function Home() {
             {/* Chat Transcript */}
             <div className="flex flex-col mb-6 h-[40vh]">
               <div className="relative flex items-center mb-2 h-6">
-                <p className="text-sm font-medium relative">
-                  Transcrip
-                  <span className="relative">
-                    t
-                    <AutoAwesomeIcon className="absolute -top-1 -right-4 h-2.5 w-2.5 text-yellow-400" />
-                  </span>
+                <p className="text-sm font-medium">
+                  Transcript
                 </p>
               </div>
               <div className="overflow-y-auto flex-1 space-y-2 border border-border rounded-lg p-3">
@@ -720,12 +719,8 @@ export default function Home() {
             {/* Example Prompts */}
             <div className="mt-auto">
               <div className="relative flex items-center mb-2 h-6">
-                <p className="text-sm font-medium relative">
-                  Example Prompt
-                  <span className="relative">
-                    s
-                    <AutoAwesomeIcon className="absolute -top-1 -right-4 h-2.5 w-2.5 text-yellow-400" />
-                  </span>
+                <p className="text-sm font-medium">
+                  Example Prompts
                 </p>
               </div>
               <TypewriterBadges 
