@@ -32,7 +32,7 @@ Portfolio Assistant is a voice-enabled AI application designed to provide financ
     *   WebRTC for real-time audio communication.
     *   Azure Real-time AI (or similar, via `/api/session`) for Speech-to-Text (STT) and Text-to-Speech (TTS) and AI function calling.
 *   **Financial Data Source**:
-    *   Likely uses a service like Yahoo Finance API via RapidAPI (inferred from `rapidApiKey` and common stock API providers).
+    *   Uses Yahoo Finance API via RapidAPI (inferred from `rapidApiKey` and common stock API providers).
 
 ## Getting Started
 
@@ -77,7 +77,7 @@ Follow these instructions to get a copy of the project up and running on your lo
     AZURE_AI_SPEECH_REGION=your_azure_speech_service_region_here # If applicable
     # Add any other keys required by your /api/keys and /api/session backend
     ```
-    *Note: You will need to implement the logic in `app/api/keys/route.ts` and `app/api/session/route.ts` (and other API routes) to securely access these environment variables and provide them to the frontend or use them server-side.*
+    *Note: You will need to implement the logic in `app/api/keys/route.ts` and `app/api/session/route.ts` (and other API routes) to securely access these environment variables and provide them to the frontend or use them server-side. If you are adding new variables.*
 
 ### Running the Application
 
