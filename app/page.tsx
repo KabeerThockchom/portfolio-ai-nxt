@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Mic, MicOff, BarChart4, Info, ChevronLeft, ChevronRight } from "lucide-react"
+import { Mic, MicOff, BarChart4, Info, ChevronLeft, ChevronRight, Sparkles } from "lucide-react"
 import StockInfoPanel from "@/components/stock-info-panel"
 import { useToast } from "@/hooks/use-toast"
 import StockChart from "@/components/stock-chart"
@@ -71,6 +71,17 @@ const examplePrompts = [
   "Key stats for Microsoft?",
   "Amazon's stock price last 5 years",
 ];
+
+// Custom AutoAwesome icon component that mimics Material UI's AutoAwesome
+const AutoAwesomeIcon = ({ className = "" }: { className?: string }) => {
+  return (
+    <span className={`${className} animate-pulse-glow`}>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#ffe600" width="24" height="24">
+        <path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z" />
+      </svg>
+    </span>
+  );
+};
 
 export default function Home() {
   const [isListening, setIsListening] = useState(false)
@@ -615,6 +626,27 @@ export default function Home() {
     touchStartXRef.current = null;
   }, [navigateToPrevious, navigateToNext, chartHistory.length]);
 
+  // Add this to the main function to include the CSS animation
+  useEffect(() => {
+    // Add the animation CSS to the document
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @keyframes pulse-glow {
+        0% { filter: drop-shadow(0 0 2px #ffe600); }
+        50% { filter: drop-shadow(0 0 4px #ffe600); }
+        100% { filter: drop-shadow(0 0 2px #ffe600); }
+      }
+      .animate-pulse-glow {
+        animation: pulse-glow 2s infinite;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   return (
     <main className="min-h-screen bg-background flex flex-col overflow-hidden">
       <header className="border-b border-border py-3 px-4 flex justify-between items-center">
@@ -645,7 +677,7 @@ export default function Home() {
                 llmAudioElementRef={audioElementRef}
                 onStartAssistant={startAssistant}
                 onStopAssistant={stopAssistant}
-                canvasClassName="w-20 h-20 cursor-pointer" 
+                canvasClassName="w-36 h-36 md:w-40 md:h-40 cursor-pointer" 
               />
               <p className="text-xs text-muted-foreground mt-2">
                 {isListening
@@ -659,7 +691,15 @@ export default function Home() {
             
             {/* Chat Transcript */}
             <div className="flex flex-col mb-6 h-[40vh]">
-              <h3 className="font-medium mb-2">Transcript</h3>
+              <div className="relative flex items-center mb-2 h-6">
+                <p className="text-sm font-medium relative">
+                  Transcrip
+                  <span className="relative">
+                    t
+                    <AutoAwesomeIcon className="absolute -top-1 -right-4 h-2.5 w-2.5 text-yellow-400" />
+                  </span>
+                </p>
+              </div>
               <div className="overflow-y-auto flex-1 space-y-2 border border-border rounded-lg p-3">
                 {llmResponseHistory.map((text, index) => (
                   <div key={index} className="text-sm text-muted-foreground p-2 bg-muted/50 rounded-md">
@@ -679,7 +719,15 @@ export default function Home() {
             
             {/* Example Prompts */}
             <div className="mt-auto">
-              <h3 className="font-medium mb-2">Example Prompts</h3>
+              <div className="relative flex items-center mb-2 h-6">
+                <p className="text-sm font-medium relative">
+                  Example Prompt
+                  <span className="relative">
+                    s
+                    <AutoAwesomeIcon className="absolute -top-1 -right-4 h-2.5 w-2.5 text-yellow-400" />
+                  </span>
+                </p>
+              </div>
               <TypewriterBadges 
                 prompts={examplePrompts} 
                 onBadgeClick={handlePromptClick} 

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 interface AudioSphereVisualizerProps {
   isAssistantListening: boolean;
@@ -11,12 +11,16 @@ interface AudioSphereVisualizerProps {
   canvasClassName?: string;
 }
 
-const PARTICLE_COUNT = 75; // Number of orbiting "atoms"
-const ORBIT_RADIUS_MIN = 1.0;
-const ORBIT_RADIUS_MAX = 1.8;
-const PARTICLE_SIZE_MIN = 0.03;
-const PARTICLE_SIZE_MAX = 0.07;
-const EXPANSION_FACTOR = 1.3;
+const NUCLEUS_SIZE = 0.8;
+const NUCLEUS_PARTICLES = 1;
+const ORBITAL_COUNT = 5;
+const PARTICLES_PER_ORBITAL = 35;
+const PARTICLE_SIZE_MIN = 0.04;
+const PARTICLE_SIZE_MAX = 0.09;
+const ORBITAL_RADIUS_MIN = 1.2;
+const ORBITAL_RADIUS_MAX = 2.5;
+const ORBITAL_THICKNESS = 0.25;
+const EXPANSION_FACTOR = 1.5;
 const REACTION_THRESHOLD = 15; // Audio level to trigger reaction
 
 const AudioSphereVisualizer: React.FC<AudioSphereVisualizerProps> = ({
@@ -29,16 +33,18 @@ const AudioSphereVisualizer: React.FC<AudioSphereVisualizerProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [userHasInteracted, setUserHasInteracted] = useState(false); 
-  const visualizerSensitivity = 1.5; // Increased for particle reaction
-  const palette = useMemo(() => ['#ffe600', '#ffffff', '#cccccc', '#999999'], []);
+  const visualizerSensitivity = 1.8;
+  const palette = useMemo(() => ['#ffe600', '#ffffff', '#cccccc', '#f5f5f5'], []);
+  const nucleusPalette = useMemo(() => ['#ffe600', '#ffff00'], []);
 
   const animationRefs = useRef<any>({
     scene: null,
     camera: null,
     renderer: null,
     controls: null,
-    particlesGroup: null,
-    particles: [], // To store individual particle data { mesh, originalScale, originalRadius, orbitSpeed, orbitAxis, currentRadius, currentScale, lastAudioImpact }
+    nucleus: null,
+    orbitals: [],
+    particles: [],
     frameId: null,
     visAudioContext: null,
     visAnalyser: null,
@@ -55,58 +61,119 @@ const AudioSphereVisualizer: React.FC<AudioSphereVisualizerProps> = ({
 
     refs.scene = new THREE.Scene();
     refs.camera = new THREE.PerspectiveCamera(60, currentContainer.clientWidth / currentContainer.clientHeight, 0.1, 100);
-    refs.camera.position.z = 4.0;
-
+    refs.camera.position.z = 5.5;
+    
     refs.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     refs.renderer.setSize(currentContainer.clientWidth, currentContainer.clientHeight);
     refs.renderer.setPixelRatio(window.devicePixelRatio);
     currentContainer.appendChild(refs.renderer.domElement);
 
-    refs.particlesGroup = new THREE.Group();
-    refs.scene.add(refs.particlesGroup);
-
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const particleSize = THREE.MathUtils.randFloat(PARTICLE_SIZE_MIN, PARTICLE_SIZE_MAX);
+    // Create nucleus (center of atom)
+    refs.nucleus = new THREE.Group();
+    refs.scene.add(refs.nucleus);
+    
+    // Add particles to represent the nucleus
+    for (let i = 0; i < NUCLEUS_PARTICLES; i++) {
+      const particleSize = THREE.MathUtils.randFloat(NUCLEUS_SIZE * 0.2, NUCLEUS_SIZE * 0.4);
       const geometry = new THREE.SphereGeometry(particleSize, 8, 8);
-      const color = new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
+      const color = new THREE.Color(nucleusPalette[Math.floor(Math.random() * nucleusPalette.length)]);
       const material = new THREE.MeshPhongMaterial({
         color: color,
         emissive: color,
-        emissiveIntensity: 0.6,
+        emissiveIntensity: 0.7,
         shininess: 50,
       });
       const mesh = new THREE.Mesh(geometry, material);
       
-      const originalRadius = THREE.MathUtils.randFloat(ORBIT_RADIUS_MIN, ORBIT_RADIUS_MAX);
-      mesh.position.x = originalRadius; // Initial position on x-axis before rotation
+      // Position randomly within nucleus radius
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.random() * Math.PI;
+      const radius = NUCLEUS_SIZE * Math.random() * 0.7;
       
-      refs.particles.push({
-        mesh,
-        originalScale: new THREE.Vector3(1,1,1), // mesh.scale.clone(),
-        currentScale: new THREE.Vector3(1,1,1), //mesh.scale.clone(),
-        originalRadius,
-        currentRadius: originalRadius,
-        orbitSpeed: THREE.MathUtils.randFloat(0.2, 0.8),
-        // Random normalized axis for pseudo-random orbit plane
-        orbitAxis: new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(),
-        // Random initial angle on the orbit plane
-        angle: Math.random() * Math.PI * 2,
-        lastAudioImpact: 0, // Timestamp of last audio impact for decay
-        isExpanding: false,
-      });
-      refs.particlesGroup.add(mesh);
+      mesh.position.set(
+        radius * Math.sin(phi) * Math.cos(theta),
+        radius * Math.sin(phi) * Math.sin(theta),
+        radius * Math.cos(phi)
+      );
+      
+      refs.nucleus.add(mesh);
+    }
+    
+    // Create orbital paths
+    for (let i = 0; i < ORBITAL_COUNT; i++) {
+      const orbital = new THREE.Group();
+      refs.scene.add(orbital);
+      refs.orbitals.push(orbital);
+      
+      // Determine this orbital's properties
+      const orbitRadius = THREE.MathUtils.lerp(ORBITAL_RADIUS_MIN, ORBITAL_RADIUS_MAX, i / (ORBITAL_COUNT - 1));
+      const orbitAxis = new THREE.Vector3(
+        Math.random() * 2 - 1,
+        Math.random() * 2 - 1,
+        Math.random() * 2 - 1
+      ).normalize();
+      
+      // Apply a random rotation to the orbital path
+      orbital.setRotationFromAxisAngle(orbitAxis, Math.random() * Math.PI * 2);
+      
+      // Create particles for this orbital
+      for (let j = 0; j < PARTICLES_PER_ORBITAL; j++) {
+        const particleSize = THREE.MathUtils.randFloat(PARTICLE_SIZE_MIN, PARTICLE_SIZE_MAX);
+        const geometry = new THREE.SphereGeometry(particleSize, 8, 8);
+        const color = new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
+        const material = new THREE.MeshPhongMaterial({
+          color: color,
+          emissive: color,
+          emissiveIntensity: 0.6,
+          shininess: 50,
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        
+        // Calculate position on the orbital ring with some variance to create a thickness
+        const angle = (j / PARTICLES_PER_ORBITAL) * Math.PI * 2;
+        const radialOffset = THREE.MathUtils.randFloatSpread(ORBITAL_THICKNESS);
+        const heightOffset = THREE.MathUtils.randFloatSpread(ORBITAL_THICKNESS);
+        
+        // Place in orbital
+        mesh.position.set(
+          (orbitRadius + radialOffset) * Math.cos(angle),
+          heightOffset,
+          (orbitRadius + radialOffset) * Math.sin(angle)
+        );
+        
+        orbital.add(mesh);
+        
+        // Store particle data for animation
+        refs.particles.push({
+          mesh,
+          orbital,
+          orbitRadius: orbitRadius + radialOffset,
+          orbitSpeed: THREE.MathUtils.randFloat(0.3, 0.8) * (i % 2 === 0 ? 1 : -1), // Alternate directions
+          angle,
+          originalScale: new THREE.Vector3(1, 1, 1),
+          currentScale: new THREE.Vector3(1, 1, 1),
+          lastAudioImpact: 0,
+          isExpanding: false,
+        });
+      }
     }
 
+    // Add lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     refs.scene.add(ambientLight);
-    const pointLight = new THREE.PointLight(0xffffff, 0.7);
+    
+    const pointLight = new THREE.PointLight(0xffffff, 1.0);
     pointLight.position.set(3, 3, 3);
     refs.scene.add(pointLight);
 
+    // Setup orbit controls
     refs.controls = new OrbitControls(refs.camera, refs.renderer.domElement);
-    refs.controls.enableZoom = false; refs.controls.enablePan = false;
-    refs.controls.enableDamping = true; refs.controls.dampingFactor = 0.1;
-    refs.controls.autoRotate = true; refs.controls.autoRotateSpeed = 0.3;
+    refs.controls.enableZoom = false;
+    refs.controls.enablePan = false;
+    refs.controls.enableDamping = true;
+    refs.controls.dampingFactor = 0.1;
+    refs.controls.autoRotate = true;
+    refs.controls.autoRotateSpeed = 0.5;
 
     let lastTime = 0;
     const animate = (time: number) => {
@@ -114,6 +181,7 @@ const AudioSphereVisualizer: React.FC<AudioSphereVisualizerProps> = ({
       const deltaTime = (time - lastTime) * 0.001;
       lastTime = time;
 
+      // Get audio data if available
       let audioActive = false;
       let averageFrequency = 0;
       if (refs.visAnalyser && refs.visDataArray && refs.currentVisSource) {
@@ -124,36 +192,56 @@ const AudioSphereVisualizer: React.FC<AudioSphereVisualizerProps> = ({
         if (averageFrequency > REACTION_THRESHOLD) audioActive = true;
       }
 
-      refs.particles.forEach((p: any) => {
-        // Orbiting logic
-        p.angle += p.orbitSpeed * deltaTime;
-        const q = new THREE.Quaternion().setFromAxisAngle(p.orbitAxis, p.angle);
-        p.mesh.position.set(p.currentRadius, 0, 0).applyQuaternion(q);
-
-        // Audio reaction logic
-        if (audioActive) {
-            // Randomly decide if this particle reacts this frame or if it's already expanding
-            if (p.isExpanding || Math.random() < 0.05) { // Small chance to pick new particle
-                p.isExpanding = true;
-                p.lastAudioImpact = time;
-                const intensityFactor = Math.min(averageFrequency / 100, 1.0) * visualizerSensitivity;
-                p.currentRadius = p.originalRadius * (1 + intensityFactor * (EXPANSION_FACTOR -1));
-                p.currentScale.set(1 + intensityFactor, 1 + intensityFactor, 1 + intensityFactor);
-            }
-        } 
+      // Gently pulse the nucleus
+      if (refs.nucleus) {
+        const pulseScale = 1 + Math.sin(time * 0.001) * 0.05;
+        refs.nucleus.scale.set(pulseScale, pulseScale, pulseScale);
         
-        if (p.isExpanding && (!audioActive || (time - p.lastAudioImpact > 200))) { // Decay after 200ms or if audio stops
-             p.isExpanding = false; // Start decay even if audio is still going but this particle wasn't picked again
+        // Make nucleus more vibrant on audio
+        if (audioActive) {
+          const intensityFactor = Math.min(averageFrequency / 100, 1.0) * 0.3;
+          refs.nucleus.scale.set(pulseScale + intensityFactor, pulseScale + intensityFactor, pulseScale + intensityFactor);
+        }
+      }
+
+      // Animate orbital particles
+      refs.particles.forEach((p: any) => {
+        // Update position on orbital path
+        p.angle += p.orbitSpeed * deltaTime;
+        p.mesh.position.x = p.orbitRadius * Math.cos(p.angle);
+        p.mesh.position.z = p.orbitRadius * Math.sin(p.angle);
+
+        // Audio reaction
+        if (audioActive) {
+          // Randomly decide if this particle reacts or if it's already expanding
+          if (p.isExpanding || Math.random() < 0.05) {
+            p.isExpanding = true;
+            p.lastAudioImpact = time;
+            const intensityFactor = Math.min(averageFrequency / 100, 1.0) * visualizerSensitivity;
+            p.currentScale.set(1 + intensityFactor, 1 + intensityFactor, 1 + intensityFactor);
+          }
+        }
+        
+        // Decay after time or if audio stops
+        if (p.isExpanding && (!audioActive || (time - p.lastAudioImpact > 200))) {
+          p.isExpanding = false;
         }
 
-        if(!p.isExpanding && (p.currentRadius !== p.originalRadius || p.currentScale.x !== p.originalScale.x)) {
-            // Decay back to original state
-            p.currentRadius = THREE.MathUtils.lerp(p.currentRadius, p.originalRadius, 4 * deltaTime); // Faster decay
-            p.currentScale.lerp(p.originalScale, 4 * deltaTime);
-            if(Math.abs(p.currentRadius - p.originalRadius) < 0.01) p.currentRadius = p.originalRadius;
-            if(Math.abs(p.currentScale.x - p.originalScale.x) < 0.01) p.currentScale.copy(p.originalScale);
+        // Gradually return to original scale
+        if (!p.isExpanding && p.currentScale.x !== p.originalScale.x) {
+          p.currentScale.lerp(p.originalScale, 4 * deltaTime);
+          if (Math.abs(p.currentScale.x - p.originalScale.x) < 0.01) {
+            p.currentScale.copy(p.originalScale);
+          }
         }
+        
         p.mesh.scale.copy(p.currentScale);
+      });
+      
+      // Update orbitals
+      refs.orbitals.forEach((orbital: THREE.Group, i: number) => {
+        orbital.rotation.x += deltaTime * 0.1 * (i % 2 === 0 ? 1 : -1);
+        orbital.rotation.y += deltaTime * 0.15;
       });
       
       refs.controls.update();
@@ -176,16 +264,28 @@ const AudioSphereVisualizer: React.FC<AudioSphereVisualizerProps> = ({
         currentContainer.removeChild(refs.renderer.domElement);
       }
       if (refs.renderer) refs.renderer.dispose();
+      
+      // Clean up all meshes
       refs.particles.forEach((p: any) => {
         p.mesh.geometry.dispose();
         (p.mesh.material as THREE.Material).dispose();
       });
-      if (refs.scene) refs.scene.clear(); // Clear scene children
+      
+      if (refs.nucleus) {
+        refs.nucleus.children.forEach((child: THREE.Object3D) => {
+          if (child instanceof THREE.Mesh) {
+            child.geometry.dispose();
+            (child.material as THREE.Material).dispose();
+          }
+        });
+      }
+      
+      if (refs.scene) refs.scene.clear();
       window.removeEventListener('resize', handleResize);
     };
-  }, [palette]); // Only run scene setup once
+  }, [palette, nucleusPalette]);
 
-  // Effect for managing audio sources (largely same as before)
+  // Audio infrastructure (same as before)
   useEffect(() => {
     const refs = animationRefs.current;
     const initBaseAudioInfra = async () => {

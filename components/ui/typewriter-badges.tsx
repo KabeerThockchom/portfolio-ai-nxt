@@ -94,15 +94,6 @@ const TypewriterBadges: React.FC<TypewriterBadgesProps> = ({
 
   return (
     <div className={containerClassName}>
-      <div className="relative flex items-center justify-center mb-2 h-6">
-        <p className="text-xs text-muted-foreground relative">
-          Ask m
-          <span className="relative">
-            e
-            <Sparkles className="absolute -top-1 -right-4 h-3 w-3 text-yellow-400 transform rotate-12" />
-          </span>
-        </p>
-      </div>
       <div className="flex flex-wrap gap-2 justify-center">
         {displayedPromptsContent.map((text, index) => (
           prompts[index] ? (
