@@ -128,18 +128,25 @@ export default function Home() {
 
   const fetchApiKeys = async () => {
     try {
-      const response = await fetch("/api/keys")
-      const data = await response.json()
-      setRapidApiKey(data.rapidApiKey)
+      // Get user's timezone
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
+      // Fetch API keys
+      const keysResponse = await fetch("/api/keys");
+      const keysData = await keysResponse.json();
+      setRapidApiKey(keysData.rapidApiKey);
+      
+      // Initialize session with user's timezone
+      await fetch(`/api/session?timezone=${encodeURIComponent(userTimezone)}`);
     } catch (error) {
-      console.error("Failed to load API keys:", error)
+      console.error("Failed to load API keys:", error);
       toast({
         title: "Error",
         description: "Failed to load API keys. Some features may not work.",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const fetchStockChart = useCallback(async (args: any): Promise<ApiStockChartResponse | { success: false; error: string }> => {
     try {
@@ -202,6 +209,22 @@ export default function Home() {
     }
   }, []);
 
+  // Define stopAssistant before it's used in handleFunctionCall
+  const stopAssistant = useCallback(() => {
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close()
+      peerConnectionRef.current = null
+    }
+    if (dataChannelRef.current) {
+      dataChannelRef.current.close()
+      dataChannelRef.current = null
+    }
+    if (audioElementRef.current) {
+      audioElementRef.current.srcObject = null
+    }
+    setIsListening(false)
+  }, []);
+
   // DEFINE handleFunctionCall and configureDataChannel BEFORE startAssistant
   const handleFunctionCall = useCallback(async (msg: any, dataChannel: RTCDataChannel) => {
     try {
@@ -251,6 +274,14 @@ export default function Home() {
       } else if (msg.name === "getStockStatistics") {
         apiResponse = await fetchStockStatistics(args)
         if (apiResponse && !apiResponse.success) toast({ title: "Error fetching statistics", description: apiResponse.error, variant: "destructive" });
+      } else if (msg.name === "muteAssistant") {
+        // Allow the assistant to end the conversation
+        stopAssistant();
+        toast({
+          title: "Assistant Disconnected",
+          description: args.message || "The assistant has ended the conversation.",
+        });
+        apiResponse = { success: true };
       } else {
         apiResponse = { success: false, error: "Function not implemented" }
       }
@@ -283,7 +314,7 @@ export default function Home() {
          dataChannelRef.current.send(JSON.stringify({ type: "response.create" }))
       }
     }
-  }, [toast, fetchStockChart, fetchStockProfile, fetchStockStatistics]); // Added fetch functions as dependencies
+  }, [toast, fetchStockChart, fetchStockProfile, fetchStockStatistics, stopAssistant]);
 
   const configureDataChannel = useCallback((dataChannel: RTCDataChannel) => {
     const event = {
@@ -342,6 +373,18 @@ export default function Home() {
                 region: { type: "string", description: "Region code (e.g., US)" },
               },
               required: ["symbol"],
+            },
+          },
+          {
+            type: "function",
+            name: "muteAssistant",
+            description: "Allows the assistant to end the current conversation",
+            parameters: {
+              type: "object",
+              properties: {
+                message: { type: "string", description: "Optional message explaining why the conversation is ending" },
+              },
+              required: [],
             },
           },
         ],
@@ -475,21 +518,6 @@ export default function Home() {
       }
     }
   }, [rtcHelpers, toast, configureDataChannel, handleFunctionCall]);
-
-  const stopAssistant = useCallback(() => {
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close()
-      peerConnectionRef.current = null
-    }
-    if (dataChannelRef.current) {
-      dataChannelRef.current.close()
-      dataChannelRef.current = null
-    }
-    if (audioElementRef.current) {
-      audioElementRef.current.srcObject = null
-    }
-    setIsListening(false)
-  }, []);
 
   const handlePromptClick = (prompt: string) => {
     if (!isListening) {
@@ -630,9 +658,9 @@ export default function Home() {
             </div>
             
             {/* Chat Transcript */}
-            <div className="flex-1 overflow-hidden mb-6">
+            <div className="flex flex-col mb-6 h-[40vh]">
               <h3 className="font-medium mb-2">Transcript</h3>
-              <div className="h-[calc(100%-2rem)] overflow-y-auto space-y-2 border border-border rounded-lg p-3">
+              <div className="overflow-y-auto flex-1 space-y-2 border border-border rounded-lg p-3">
                 {llmResponseHistory.map((text, index) => (
                   <div key={index} className="text-sm text-muted-foreground p-2 bg-muted/50 rounded-md">
                     {text}
