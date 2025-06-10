@@ -649,40 +649,65 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-background flex flex-col overflow-hidden">
-      <header className="border-b border-border py-3 px-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold flex items-center">
-          Portfolio A<span className="relative">I
-          <AutoAwesomeIcon className="absolute -top-2 -right-4 h-2 w-2" />
-          </span>
-        </h1>
-        <ThemeToggle />
+      <header className="relative border-b border-border/20 py-4 px-6 flex justify-between items-center backdrop-blur-xl bg-white/10 dark:bg-black/10 before:absolute before:inset-0 before:bg-gradient-to-r before:from-white/5 before:via-transparent before:to-white/5 before:backdrop-blur-xl before:-z-10 after:absolute after:inset-0 after:bg-gradient-to-b after:from-white/20 after:via-transparent after:to-transparent after:backdrop-blur-sm after:-z-10 shadow-lg shadow-black/5 dark:shadow-white/5">
+        {/* Liquid Glass overlay with specular highlights */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-white/10 dark:from-white/10 dark:via-transparent dark:to-white/5 pointer-events-none"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-transparent via-white/5 to-white/20 dark:from-transparent dark:via-white/2 dark:to-white/10 pointer-events-none"></div>
+        
+        {/* Animated specular highlights */}
+        <div className="absolute top-0 left-1/4 w-32 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent animate-pulse pointer-events-none"></div>
+        <div className="absolute bottom-0 right-1/3 w-24 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent animate-pulse delay-1000 pointer-events-none"></div>
+        
+        {/* Content with proper z-index */}
+        <div className="relative z-10 flex items-center">
+          <h1 className="text-2xl font-bold flex items-center text-foreground/90 backdrop-blur-sm">
+            Portfolio A<span className="relative">I
+            <AutoAwesomeIcon className="absolute -top-2 -right-4 h-2 w-2" />
+            </span>
+          </h1>
+        </div>
+        
+        <div className="relative z-10">
+          <div className="p-1 rounded-xl bg-white/20 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/10 shadow-inner">
+            <ThemeToggle />
+          </div>
+        </div>
       </header>
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className={`border-r border-border transition-all duration-300 bg-card ${isSidebarCollapsed ? 'w-12' : 'w-80'} flex flex-col`}>
-          <div className="flex justify-end p-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            >
-              {isSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-            </Button>
+        <aside className={`border-r border-border/20 transition-all duration-300 bg-white/5 dark:bg-black/5 backdrop-blur-xl ${isSidebarCollapsed ? 'w-12' : 'w-80'} flex flex-col relative`}>
+          {/* Liquid Glass overlay for sidebar */}
+          <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-white/5 to-transparent dark:from-white/5 dark:via-white/2 dark:to-transparent pointer-events-none"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent dark:from-transparent dark:via-white/2 dark:to-transparent pointer-events-none"></div>
+          
+          <div className="relative z-10 flex justify-end p-2">
+            <div className="p-1 rounded-lg bg-white/20 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/10">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                className="hover:bg-white/20 dark:hover:bg-white/10 transition-colors"
+              >
+                {isSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+              </Button>
+            </div>
           </div>
           
           {/* Sidebar content */}
-          <div className={`flex-1 flex flex-col p-4 ${isSidebarCollapsed ? 'hidden' : ''}`}>
+          <div className={`relative z-10 flex-1 flex flex-col p-4 ${isSidebarCollapsed ? 'hidden' : ''}`}>
             {/* Audio Visualizer */}
             <div className="flex flex-col items-center justify-center mb-6">
-              <AudioSphereVisualizer 
-                isAssistantListening={isListening}
-                llmAudioElementRef={audioElementRef}
-                onStartAssistant={startAssistant}
-                onStopAssistant={stopAssistant}
-                canvasClassName="w-36 h-36 md:w-40 md:h-40 cursor-pointer" 
-              />
-              <p className="text-xs text-muted-foreground mt-2">
+              <div className="p-2 rounded-2xl bg-white/10 dark:bg-black/10 backdrop-blur-md border border-white/30 dark:border-white/10 shadow-lg">
+                <AudioSphereVisualizer 
+                  isAssistantListening={isListening}
+                  llmAudioElementRef={audioElementRef}
+                  onStartAssistant={startAssistant}
+                  onStopAssistant={stopAssistant}
+                  canvasClassName="w-36 h-36 md:w-40 md:h-40 cursor-pointer" 
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 backdrop-blur-sm bg-white/10 dark:bg-black/10 px-2 py-1 rounded-md border border-white/20 dark:border-white/10">
                 {isListening
                   ? "Tap to mute"
                   : mounted && rtcHelpers
@@ -695,18 +720,18 @@ export default function Home() {
             {/* Chat Transcript */}
             <div className="flex flex-col mb-6 h-[40vh]">
               <div className="relative flex items-center mb-2 h-6">
-                <p className="text-sm font-medium">
+                <p className="text-sm font-medium backdrop-blur-sm bg-white/10 dark:bg-black/10 px-2 py-1 rounded-md border border-white/20 dark:border-white/10">
                   Transcript
                 </p>
               </div>
-              <div className="overflow-y-auto flex-1 space-y-2 border border-border rounded-lg p-3">
+              <div className="overflow-y-auto flex-1 space-y-2 border border-white/20 dark:border-white/10 rounded-lg p-3 backdrop-blur-md bg-white/5 dark:bg-black/5">
                 {llmResponseHistory.map((text, index) => (
-                  <div key={index} className="text-sm text-muted-foreground p-2 bg-muted/50 rounded-md">
+                  <div key={index} className="text-sm text-muted-foreground p-2 bg-white/10 dark:bg-black/10 rounded-md backdrop-blur-sm border border-white/20 dark:border-white/10">
                     {text}
                   </div>
                 ))}
                 {currentLlmMessage && (
-                  <div className="text-sm text-foreground p-2 bg-primary/10 rounded-md animate-pulse">
+                  <div className="text-sm text-foreground p-2 bg-primary/20 rounded-md animate-pulse backdrop-blur-sm border border-primary/30">
                     {currentLlmMessage}
                   </div>
                 )}
@@ -719,7 +744,7 @@ export default function Home() {
             {/* Example Prompts */}
             <div className="mt-auto">
               <div className="relative flex items-center mb-2 h-6">
-                <p className="text-sm font-medium">
+                <p className="text-sm font-medium backdrop-blur-sm bg-white/10 dark:bg-black/10 px-2 py-1 rounded-md border border-white/20 dark:border-white/10">
                   Example Prompts
                 </p>
               </div>
@@ -727,16 +752,18 @@ export default function Home() {
                 prompts={examplePrompts} 
                 onBadgeClick={handlePromptClick} 
                 containerClassName="flex flex-col gap-2" 
-                badgeClassName="bg-muted/70 hover:bg-muted text-muted-foreground cursor-pointer transition-colors text-sm py-1.5 px-3 w-full text-left"
+                badgeClassName="bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 text-muted-foreground cursor-pointer transition-colors text-sm py-1.5 px-3 w-full text-left backdrop-blur-md border border-white/20 dark:border-white/10 rounded-lg"
               />
             </div>
           </div>
           
           {/* Collapsed state only shows icons */}
-          <div className={`flex-1 flex flex-col items-center py-4 ${!isSidebarCollapsed ? 'hidden' : ''}`}>
-            <Button variant="ghost" size="icon" onClick={() => setIsSidebarCollapsed(false)} className="mb-4">
-              <Mic className={`h-5 w-5 ${isListening ? 'text-primary' : 'text-muted-foreground'}`} />
-            </Button>
+          <div className={`relative z-10 flex-1 flex flex-col items-center py-4 ${!isSidebarCollapsed ? 'hidden' : ''}`}>
+            <div className="p-1 rounded-lg bg-white/20 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/10">
+              <Button variant="ghost" size="icon" onClick={() => setIsSidebarCollapsed(false)} className="mb-4 hover:bg-white/20 dark:hover:bg-white/10">
+                <Mic className={`h-5 w-5 ${isListening ? 'text-primary' : 'text-muted-foreground'}`} />
+              </Button>
+            </div>
           </div>
         </aside>
         
@@ -751,38 +778,44 @@ export default function Home() {
             {/* Chart History Navigation */}
             {chartHistory.length > 1 && (
               <div className="flex items-center justify-center gap-4 mb-4">
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  onClick={navigateToPrevious}
-                  disabled={currentHistoryIndex <= 0}
-                  aria-label="Previous chart"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
+                <div className="p-1 rounded-lg bg-white/10 dark:bg-black/10 backdrop-blur-md border border-white/20 dark:border-white/10">
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={navigateToPrevious}
+                    disabled={currentHistoryIndex <= 0}
+                    aria-label="Previous chart"
+                    className="bg-white/10 dark:bg-black/10 border-white/20 dark:border-white/10 hover:bg-white/20 dark:hover:bg-black/20"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                </div>
                 
-                <div className="flex space-x-2">
+                <div className="flex space-x-2 p-2 rounded-lg bg-white/10 dark:bg-black/10 backdrop-blur-md border border-white/20 dark:border-white/10">
                   {chartHistory.map((_, index) => (
                     <button 
                       key={`dot-${index}`} 
                       onClick={() => navigateToHistory(index)}
                       className={`h-3 w-3 rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-1 focus:ring-yellow-500/70 ${
-                        currentHistoryIndex === index ? 'bg-yellow-400 scale-110' : 'bg-muted hover:bg-muted-foreground/50'
+                        currentHistoryIndex === index ? 'bg-yellow-400 scale-110 shadow-lg shadow-yellow-400/50' : 'bg-white/30 dark:bg-white/20 hover:bg-white/50 dark:hover:bg-white/30'
                       }`}
                       aria-label={`View chart ${index + 1}`}
                     />
                   ))}
                 </div>
                 
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  onClick={navigateToNext}
-                  disabled={currentHistoryIndex >= chartHistory.length - 1}
-                  aria-label="Next chart"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                <div className="p-1 rounded-lg bg-white/10 dark:bg-black/10 backdrop-blur-md border border-white/20 dark:border-white/10">
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={navigateToNext}
+                    disabled={currentHistoryIndex >= chartHistory.length - 1}
+                    aria-label="Next chart"
+                    className="bg-white/10 dark:bg-black/10 border-white/20 dark:border-white/10 hover:bg-white/20 dark:hover:bg-black/20"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             )}
             
@@ -804,31 +837,37 @@ export default function Home() {
                         : 'translate-y-8')
               }`}
             >
-              <Card className="border-secondary">
-                <CardContent className="p-6">
+              <Card className="border-white/20 dark:border-white/10 bg-white/5 dark:bg-black/5 backdrop-blur-xl relative overflow-hidden">
+                {/* Liquid Glass overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-white/10 dark:from-white/10 dark:via-transparent dark:to-white/5 pointer-events-none"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-transparent via-white/5 to-white/15 dark:from-transparent dark:via-white/2 dark:to-white/8 pointer-events-none"></div>
+                
+                <CardContent className="relative z-10 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-semibold">Stock Visualization</h2>
                     <div className="flex items-center gap-2">
-                      <select
-                        id="chartView"
-                        className="px-3 py-2 rounded-md border border-input bg-background text-foreground"
-                        value={currentChartView}
-                        onChange={(e) => setCurrentChartView(e.target.value as "price" | "percent" | "relative")}
-                      >
-                        <option value="price">Price</option>
-                        <option value="percent">Percent Change</option>
-                        <option value="relative">Relative Performance</option>
-                      </select>
+                      <div className="p-1 rounded-lg bg-white/20 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/10">
+                        <select
+                          id="chartView"
+                          className="px-3 py-2 rounded-md border-0 bg-white/10 dark:bg-black/10 text-foreground backdrop-blur-sm focus:ring-2 focus:ring-primary/50"
+                          value={currentChartView}
+                          onChange={(e) => setCurrentChartView(e.target.value as "price" | "percent" | "relative")}
+                        >
+                          <option value="price">Price</option>
+                          <option value="percent">Percent Change</option>
+                          <option value="relative">Relative Performance</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
                   {chartData && chartData.chart && chartData.chart.result && chartData.chart.result.length > 0 && (
-                    <div className="flex flex-wrap justify-between items-center mb-4 text-sm">
-                      <div className="bg-muted px-3 py-1 rounded-md">
+                    <div className="flex flex-wrap justify-between items-center mb-4 text-sm gap-2">
+                      <div className="bg-white/10 dark:bg-black/10 px-3 py-1 rounded-md backdrop-blur-sm border border-white/20 dark:border-white/10">
                         <span className="font-medium">Interval:</span>{" "}
                         {chartData.chart.result[0].meta.dataGranularity || "1d"}
                       </div>
-                      <div className="bg-muted px-3 py-1 rounded-md">
+                      <div className="bg-white/10 dark:bg-black/10 px-3 py-1 rounded-md backdrop-blur-sm border border-white/20 dark:border-white/10">
                         <span className="font-medium">Range:</span> {chartData.chart.result[0].meta.range || "1mo"}
                       </div>
                     </div>
@@ -840,7 +879,7 @@ export default function Home() {
                         variant={selectedStock === mainStock ? "default" : "outline"}
                         size="sm"
                         onClick={() => setSelectedStock(mainStock)}
-                        className="bg-primary text-primary-foreground hover:bg-primary/90"
+                        className="bg-primary/20 text-primary-foreground hover:bg-primary/30 backdrop-blur-sm border border-primary/30"
                       >
                         {mainStock}
                       </Button>
@@ -851,7 +890,9 @@ export default function Home() {
                           size="sm"
                           onClick={() => setSelectedStock(symbol)}
                           className={
-                            selectedStock === symbol ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""
+                            selectedStock === symbol 
+                              ? "bg-primary/20 text-primary-foreground hover:bg-primary/30 backdrop-blur-sm border border-primary/30" 
+                              : "bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 backdrop-blur-sm border border-white/20 dark:border-white/10"
                           }
                         >
                           {symbol}
@@ -860,13 +901,13 @@ export default function Home() {
                     </div>
                   )}
 
-                  <div id="chartContainer" className={`w-full min-h-[300px] ${chartData && !isLoading ? "visible" : "hidden"}`}>
+                  <div id="chartContainer" className={`w-full min-h-[300px] rounded-lg overflow-hidden ${chartData && !isLoading ? "visible" : "hidden"}`}>
                     {chartData && !isLoading && <StockChart chartData={chartData} symbol={selectedStock} viewMode={currentChartView} />}
                     <div className="legend-container flex flex-wrap gap-2 mt-2"></div>
                   </div>
 
                   {!chartData && !isLoading && (
-                    <div className="flex flex-col items-center justify-center h-[300px] border border-dashed rounded-lg border-secondary">
+                    <div className="flex flex-col items-center justify-center h-[300px] border border-dashed rounded-lg border-white/20 dark:border-white/10 bg-white/5 dark:bg-black/5 backdrop-blur-sm">
                       <BarChart4 className="w-10 h-10 text-muted-foreground mb-2" />
                       <p className="text-muted-foreground text-sm">Ask the assistant to show you a stock chart</p>
                     </div>
@@ -874,7 +915,7 @@ export default function Home() {
 
                   {isLoading && (
                     <div id="loadingIndicator" className="flex flex-col items-center justify-center h-[300px]">
-                      <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
+                      <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-2"></div>
                       <p className="text-muted-foreground text-sm">Loading chart data...</p>
                     </div>
                   )}
@@ -900,15 +941,19 @@ export default function Home() {
                         : 'translate-y-8')
               }`}
             >
-              <Card className="border-secondary">
-                <CardContent className="p-6">
+              <Card className="border-white/20 dark:border-white/10 bg-white/5 dark:bg-black/5 backdrop-blur-xl relative overflow-hidden">
+                {/* Liquid Glass overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-white/10 dark:from-white/10 dark:via-transparent dark:to-white/5 pointer-events-none"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-transparent via-white/5 to-white/15 dark:from-transparent dark:via-white/2 dark:to-white/8 pointer-events-none"></div>
+                
+                <CardContent className="relative z-10 p-6">
                   <h2 className="text-xl font-semibold mb-4">Stock Information</h2>
                   {chartData && chartData.chart && chartData.chart.result && chartData.chart.result.length > 0 && selectedStock ? (
                     <div className="grid grid-cols-1 gap-4">
                       <StockInfoPanel stock={selectedStock} chartData={chartData} />
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center h-[260px] border border-dashed rounded-lg border-secondary">
+                    <div className="flex flex-col items-center justify-center h-[260px] border border-dashed rounded-lg border-white/20 dark:border-white/10 bg-white/5 dark:bg-black/5 backdrop-blur-sm">
                       <Info className="w-10 h-10 text-muted-foreground mb-2" />
                       <p className="text-muted-foreground text-center text-sm">
                         Select a stock or ask the assistant for details.
