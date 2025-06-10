@@ -62,7 +62,7 @@
     "pino": "^9.7.0",
     "pino-http": "^10.4.0",
     "react": "^19",
-    "react-day-picker": "8.10.1",
+    "react-day-picker": "^9.0.0",
     "react-dom": "^19",
     "react-hook-form": "^7.54.1",
     "react-resizable-panels": "^2.1.7",
