@@ -410,7 +410,7 @@ export default function Home() {
             return updatedHistory;
           });
 
-          setTimeout(() => setShowComponents(true), 100);
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150);
         } else if (apiResponse && !apiResponse.success) {
           toast({ title: "Error fetching chart", description: apiResponse.error, variant: "destructive" });
           setChartData(null);
@@ -441,7 +441,7 @@ export default function Home() {
             return updatedHistory;
           });
 
-          setTimeout(() => setShowComponents(true), 100);
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150);
         } else if (apiResponse && !apiResponse.success) {
           toast({ title: "Error fetching profile", description: apiResponse.error, variant: "destructive" });
           setProfileData(null)
@@ -472,7 +472,7 @@ export default function Home() {
             return updatedHistory;
           });
 
-          setTimeout(() => setShowComponents(true), 100);
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150);
         } else if (apiResponse && !apiResponse.success) {
           toast({ title: "Error fetching statistics", description: apiResponse.error, variant: "destructive" });
           setStatisticsData(null)
@@ -504,7 +504,7 @@ export default function Home() {
             return updatedHistory;
           });
 
-          setTimeout(() => setShowComponents(true), 100);
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150);
         } else if (apiResponse && !apiResponse.success) {
           toast({ title: "Error fetching analysis", description: apiResponse.error, variant: "destructive" });
           setAnalysisData(null)
@@ -537,7 +537,7 @@ export default function Home() {
             return updatedHistory;
           });
 
-          setTimeout(() => setShowComponents(true), 100);
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150);
         } else if (apiResponse && !apiResponse.success) {
           toast({ title: "Error fetching recommendation trend", description: apiResponse.error, variant: "destructive" });
           setRecommendationTrendData(null)
@@ -572,7 +572,7 @@ export default function Home() {
             return updatedHistory;
           });
 
-          setTimeout(() => setShowComponents(true), 100);
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150);
         } else if (apiResponse && !apiResponse.success) {
           toast({ title: "Error fetching earnings calendar", description: apiResponse.error, variant: "destructive" });
           setEarningsCalendarData(null)
@@ -608,7 +608,7 @@ export default function Home() {
             return updatedHistory;
           });
 
-          setTimeout(() => setShowComponents(true), 100);
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150);
         } else if (apiResponse && !apiResponse.success) {
           toast({ title: "Error fetching trending tickers", description: apiResponse.error, variant: "destructive" });
           setTrendingTickersData(null)
@@ -971,6 +971,7 @@ export default function Home() {
       setShowComponents(false); // Hide components for smooth transition
       const historyItem = contentHistory[index];
 
+      // First timeout: Clear old states and let them render
       setTimeout(() => {
         // Clear all states first
         setChartData(null);
@@ -981,36 +982,43 @@ export default function Home() {
         setEarningsCalendarData(null);
         setTrendingTickersData(null);
 
-        // Restore based on content type
-        if (historyItem.type === "chart") {
-          setChartData(historyItem.chartData || null);
-          setMainStock(historyItem.mainStock || "");
-          setSelectedStock(historyItem.selectedStock || "");
-          setComparisonStocks(historyItem.comparisonStocks || []);
-          setCurrentChartView(historyItem.viewMode || "price");
-        } else if (historyItem.type === "profile") {
-          setProfileData(historyItem.profileData);
-          setProfileSymbol(historyItem.symbol);
-        } else if (historyItem.type === "statistics") {
-          setStatisticsData(historyItem.statisticsData);
-          setStatisticsSymbol(historyItem.symbol);
-        } else if (historyItem.type === "analysis") {
-          setAnalysisData(historyItem.analysisData);
-          setAnalysisSymbol(historyItem.symbol);
-        } else if (historyItem.type === "recommendation-trend") {
-          setRecommendationTrendData(historyItem.recommendationTrendData);
-          setRecommendationTrendSymbol(historyItem.symbol);
-        } else if (historyItem.type === "earnings-calendar") {
-          setEarningsCalendarData(historyItem.earningsCalendarData);
-          setEarningsCalendarDateRange(historyItem.earningsCalendarDateRange || {});
-        } else if (historyItem.type === "trending-tickers") {
-          setTrendingTickersData(historyItem.trendingTickersData);
-          setTrendingTickersRegion(historyItem.trendingTickersRegion || "US");
-        }
+        // Second timeout: Restore new states after clearing has rendered
+        setTimeout(() => {
+          // Restore based on content type
+          if (historyItem.type === "chart") {
+            setChartData(historyItem.chartData || null);
+            setMainStock(historyItem.mainStock || "");
+            setSelectedStock(historyItem.selectedStock || "");
+            setComparisonStocks(historyItem.comparisonStocks || []);
+            setCurrentChartView(historyItem.viewMode || "price");
+          } else if (historyItem.type === "profile") {
+            setProfileData(historyItem.profileData);
+            setProfileSymbol(historyItem.symbol);
+          } else if (historyItem.type === "statistics") {
+            setStatisticsData(historyItem.statisticsData);
+            setStatisticsSymbol(historyItem.symbol);
+          } else if (historyItem.type === "analysis") {
+            setAnalysisData(historyItem.analysisData);
+            setAnalysisSymbol(historyItem.symbol);
+          } else if (historyItem.type === "recommendation-trend") {
+            setRecommendationTrendData(historyItem.recommendationTrendData);
+            setRecommendationTrendSymbol(historyItem.symbol);
+          } else if (historyItem.type === "earnings-calendar") {
+            setEarningsCalendarData(historyItem.earningsCalendarData);
+            setEarningsCalendarDateRange(historyItem.earningsCalendarDateRange || {});
+          } else if (historyItem.type === "trending-tickers") {
+            setTrendingTickersData(historyItem.trendingTickersData);
+            setTrendingTickersRegion(historyItem.trendingTickersRegion || "US");
+          }
 
-        setCurrentHistoryIndex(index);
-        setShowComponents(true); // Show components to trigger animation
-      }, 50); // Small delay for smooth transition
+          setCurrentHistoryIndex(index);
+
+          // Use requestAnimationFrame to ensure DOM has updated before showing
+          requestAnimationFrame(() => {
+            setShowComponents(true); // Show components to trigger animation
+          });
+        }, 75); // Second delay for state restoration
+      }, 75); // First delay for state clearing
     }
   };
 
@@ -1530,7 +1538,7 @@ export default function Home() {
                         return updatedHistory;
                       });
 
-                      setTimeout(() => setShowComponents(true), 100);
+                      setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150);
                     } else {
                       toast({
                         title: "Error loading chart",
