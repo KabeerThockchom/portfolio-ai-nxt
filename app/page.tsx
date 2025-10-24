@@ -1377,10 +1377,10 @@ export default function Home() {
               </div>
             )}
             
-            {/* Main Content Card - Shows Chart, Profile, Statistics, or Analysis */}
+            {/* Main Content Card - Shows Chart, Profile, Statistics, Analysis, or Trending Tickers */}
             <div
               className={`transition-all duration-700 ease-out ${
-                showComponents && (chartData || profileData || statisticsData || analysisData || recommendationTrendData || earningsCalendarData)
+                showComponents && (chartData || profileData || statisticsData || analysisData || recommendationTrendData || earningsCalendarData || trendingTickersData)
                   ? "opacity-100 " +
                     (slideDirection === 'left'
                       ? 'animate-slide-in-from-right'
