@@ -32,10 +32,10 @@ const AudioSphereVisualizer: React.FC<AudioSphereVisualizerProps> = ({
   canvasClassName = "w-20 h-20 md:w-24 md:h-24", 
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [userHasInteracted, setUserHasInteracted] = useState(false); 
+  const [userHasInteracted, setUserHasInteracted] = useState(false);
   const visualizerSensitivity = 1.8;
-  const palette = useMemo(() => ['#ffe600', '#ffffff', '#cccccc', '#f5f5f5'], []);
-  const nucleusPalette = useMemo(() => ['#ffe600', '#ffff00'], []);
+  const palette = useMemo(() => ['#6366F1', '#8B87FF', '#A5A2FF', '#47befb', '#FFFFFF'], []);
+  const nucleusPalette = useMemo(() => ['#6366F1', '#8B87FF', '#47befb'], []);
 
   const animationRefs = useRef<any>({
     scene: null,

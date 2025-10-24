@@ -20,7 +20,7 @@ export default function StockInfoPanel({ stock, chartData }: StockInfoPanelProps
     const change = meta.regularMarketPrice - meta.chartPreviousClose
     const changePercent = (change / meta.chartPreviousClose) * 100
     const changeSign = change >= 0 ? "+" : ""
-    const cssClass = change >= 0 ? "text-green-600" : "text-red-600"
+    const cssClass = change >= 0 ? "text-success" : "text-destructive"
 
     return (
       <>
@@ -78,7 +78,7 @@ export default function StockInfoPanel({ stock, chartData }: StockInfoPanelProps
     ) {
       const change = currentPrice - prevClose
       const changePercent = (change / prevClose) * 100
-      cssClass = change >= 0 ? "text-green-600" : "text-red-600"
+      cssClass = change >= 0 ? "text-success" : "text-destructive"
       const changeSign = change >= 0 ? "+" : ""
       changeText = `${changeSign}$${change.toFixed(2)} (${changeSign}${changePercent.toFixed(2)}%)`
     }

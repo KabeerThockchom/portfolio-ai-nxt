@@ -1,68 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
+    /* Light Mode - Clean whites and grays */
     --background: 0 0% 100%;
-    --foreground: 0 0% 20%;
+    --foreground: 0 0% 4%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 20%;
+    --card: 0 0% 98%;
+    --card-foreground: 0 0% 4%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 20%;
+    --popover-foreground: 0 0% 4%;
 
-    --primary: 52 100% 50%;
-    --primary-foreground: 0 0% 20%;
+    --primary: 245 58% 61%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 80%;
-    --secondary-foreground: 0 0% 20%;
+    --secondary: 0 0% 90%;
+    --secondary-foreground: 0 0% 4%;
 
-    --muted: 0 0% 80%;
-    --muted-foreground: 0 0% 60%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
 
-    --accent: 52 100% 50%;
-    --accent-foreground: 0 0% 20%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 4%;
 
-    --destructive: 0 0% 60%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 80%;
-    --input: 0 0% 80%;
-    --ring: 52 100% 50%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 245 58% 61%;
 
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 0 0% 20%;
-    --foreground: 0 0% 100%;
+    /* Dark Mode - Pure blacks and grays */
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
 
-    --card: 0 0% 20%;
-    --card-foreground: 0 0% 100%;
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 20%;
-    --popover-foreground: 0 0% 100%;
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 52 100% 50%;
-    --primary-foreground: 0 0% 20%;
+    --primary: 245 58% 61%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 60%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 98%;
 
-    --muted: 0 0% 30%;
-    --muted-foreground: 0 0% 80%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 64%;
 
-    --accent: 52 100% 50%;
-    --accent-foreground: 0 0% 20%;
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 98%;
 
-    --destructive: 0 0% 60%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 60%;
-    --input: 0 0% 60%;
-    --ring: 52 100% 50%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 245 58% 61%;
   }
 }
 
@@ -125,4 +129,49 @@
 
 #chartContainer.visible {
   @apply block;
+}
+
+/* Markdown prose styles */
+.prose {
+  @apply text-foreground;
+}
+
+.prose strong {
+  @apply font-semibold text-foreground;
+}
+
+.prose a {
+  @apply text-primary hover:text-primary/80 underline;
+}
+
+.prose ul {
+  @apply list-disc pl-4 space-y-1;
+}
+
+.prose ol {
+  @apply list-decimal pl-4 space-y-1;
+}
+
+.prose li {
+  @apply text-foreground;
+}
+
+.prose p {
+  @apply mb-2 last:mb-0;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+  @apply font-semibold text-foreground;
+}
+
+.prose code {
+  @apply bg-muted px-1 py-0.5 rounded text-sm;
+}
+
+.prose pre {
+  @apply bg-muted p-3 rounded-lg overflow-x-auto;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-primary pl-4 italic;
 }

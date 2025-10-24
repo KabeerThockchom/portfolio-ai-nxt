@@ -1,15 +1,24 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Mic, MicOff, BarChart4, Info, ChevronLeft, ChevronRight, Sparkles } from "lucide-react"
+import { Mic, MicOff, BarChart4, Info, ChevronLeft, ChevronRight, Sparkles, HelpCircle, TrendingUp } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import StockInfoPanel from "@/components/stock-info-panel"
+import StockProfileCard from "@/components/stock-profile-card"
+import StockStatisticsCard from "@/components/stock-statistics-card"
+import StockAnalysisCard from "@/components/stock-analysis-card"
+import StockRecommendationTrendCard from "@/components/stock-recommendation-trend-card"
+import StockEarningsCalendarCard from "@/components/stock-earnings-calendar-card"
+import TrendingTickersCard from "@/components/trending-tickers-card"
 import { useToast } from "@/hooks/use-toast"
 import StockChart from "@/components/stock-chart"
 import { ThemeToggle } from "@/components/theme-toggle"
 import TypewriterBadges from "@/components/ui/typewriter-badges"
 import AudioSphereVisualizer from "@/components/ui/audio-sphere-visualizer"
+import ReactMarkdown from "react-markdown"
 
 // Define types for chartData
 interface ChartMeta {
@@ -56,20 +65,42 @@ interface ApiStockChartResponse {
 // Define the type for the dynamically imported module
 type RtcHelpersModule = typeof import('@/lib/webrtc-helpers');
 
-// Interface for chart history item
-interface ChartHistoryItem {
-  chartData: ChartData;
-  mainStock: string;
-  selectedStock: string;
-  comparisonStocks: string[];
-  viewMode: "price" | "percent" | "relative";
+// Interface for history items - supports chart, profile, and statistics
+interface HistoryItem {
+  type: "chart" | "profile" | "statistics" | "analysis" | "recommendation-trend" | "earnings-calendar" | "trending-tickers";
+  symbol: string;
+  // Chart-specific data
+  chartData?: ChartData;
+  mainStock?: string;
+  selectedStock?: string;
+  comparisonStocks?: string[];
+  viewMode?: "price" | "percent" | "relative";
+  // Profile-specific data
+  profileData?: any;
+  // Statistics-specific data
+  statisticsData?: any;
+  // Analysis-specific data
+  analysisData?: any;
+  // Recommendation Trend-specific data
+  recommendationTrendData?: any;
+  // Earnings Calendar-specific data
+  earningsCalendarData?: any;
+  earningsCalendarDateRange?: { period1?: string; period2?: string };
+  // Trending Tickers-specific data
+  trendingTickersData?: any;
+  trendingTickersRegion?: string;
 }
 
 const examplePrompts = [
-  "How did AAPL do the last 3 months?",
+  "How did Apple do the last 3 months?",
   "Compare Tesla to Ford and GM",
-  "Key stats for Microsoft?",
-  "Amazon's stock price last 5 years",
+  "Tell me about NVIDIA's company profile",
+  "What are the key stats for Microsoft?",
+  "Show me analyst recommendations for Tesla",
+  "What's the recommendation trend for Amazon?",
+  "What are the trending stocks today?",
+  "Show me upcoming earnings this week",
+  "Google's stock price over the past year",
 ];
 
 // Custom AutoAwesome icon component that mimics Material UI's AutoAwesome
@@ -89,6 +120,18 @@ export default function Home() {
   const [selectedStock, setSelectedStock] = useState("")
   const [comparisonStocks, setComparisonStocks] = useState<string[]>([])
   const [chartData, setChartData] = useState<ChartData | null>(null)
+  const [profileData, setProfileData] = useState<any | null>(null)
+  const [statisticsData, setStatisticsData] = useState<any | null>(null)
+  const [analysisData, setAnalysisData] = useState<any | null>(null)
+  const [recommendationTrendData, setRecommendationTrendData] = useState<any | null>(null)
+  const [earningsCalendarData, setEarningsCalendarData] = useState<any | null>(null)
+  const [profileSymbol, setProfileSymbol] = useState<string>("")
+  const [statisticsSymbol, setStatisticsSymbol] = useState<string>("")
+  const [analysisSymbol, setAnalysisSymbol] = useState<string>("")
+  const [recommendationTrendSymbol, setRecommendationTrendSymbol] = useState<string>("")
+  const [earningsCalendarDateRange, setEarningsCalendarDateRange] = useState<{ period1?: string; period2?: string }>({})
+  const [trendingTickersData, setTrendingTickersData] = useState<any | null>(null)
+  const [trendingTickersRegion, setTrendingTickersRegion] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [rtcHelpers, setRtcHelpers] = useState<RtcHelpersModule | null>(null);
@@ -101,8 +144,8 @@ export default function Home() {
   const [currentChartView, setCurrentChartView] = useState<"price" | "percent" | "relative">("price")
   const [mainStock, setMainStock] = useState("")
 
-  // State for chart history carousel
-  const [chartHistory, setChartHistory] = useState<ChartHistoryItem[]>([]);
+  // State for content history carousel (charts, profiles, statistics)
+  const [contentHistory, setContentHistory] = useState<HistoryItem[]>([]);
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
   const [llmResponseHistory, setLlmResponseHistory] = useState<string[]>([]);
   const [currentLlmMessage, setCurrentLlmMessage] = useState<string>("");
@@ -141,12 +184,12 @@ export default function Home() {
     try {
       // Get user's timezone
       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      
+
       // Fetch API keys
       const keysResponse = await fetch("/api/keys");
       const keysData = await keysResponse.json();
       setRapidApiKey(keysData.rapidApiKey);
-      
+
       // Initialize session with user's timezone
       await fetch(`/api/session?timezone=${encodeURIComponent(userTimezone)}`);
     } catch (error) {
@@ -156,6 +199,30 @@ export default function Home() {
         description: "Failed to load API keys. Some features may not work.",
         variant: "destructive",
       });
+    }
+  };
+
+  // Save conversation message to history file
+  const saveConversationMessage = async (role: "user" | "assistant", message: string) => {
+    try {
+      await fetch("/api/conversation/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role, message }),
+      });
+    } catch (error) {
+      console.error("Failed to save conversation message:", error);
+    }
+  };
+
+  // Clear conversation history (start fresh session)
+  const clearConversationHistory = async () => {
+    try {
+      await fetch("/api/conversation/clear", {
+        method: "POST",
+      });
+    } catch (error) {
+      console.error("Failed to clear conversation history:", error);
     }
   };
 
@@ -220,6 +287,71 @@ export default function Home() {
     }
   }, []);
 
+  const fetchStockAnalysis = useCallback(async (args: any): Promise<ApiStockChartResponse | { success: false; error: string }> => {
+    try {
+      const { symbol, region } = args
+      const params = new URLSearchParams()
+      params.append("symbol", symbol)
+      if (region) params.append("region", region)
+      const response = await fetch(`/api/stock/analysis?${params.toString()}`)
+      if (!response.ok) throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching stock analysis:", error)
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error fetching stock analysis" }
+    }
+  }, []);
+
+  const fetchStockRecommendationTrend = useCallback(async (args: any): Promise<ApiStockChartResponse | { success: false; error: string }> => {
+    try {
+      const { symbol, region } = args
+      const params = new URLSearchParams()
+      params.append("symbol", symbol)
+      if (region) params.append("region", region)
+      const response = await fetch(`/api/stock/recommendation-trend?${params.toString()}`)
+      if (!response.ok) throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching recommendation trend:", error)
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error fetching recommendation trend" }
+    }
+  }, []);
+
+  const fetchEarningsCalendar = useCallback(async (args: any): Promise<ApiStockChartResponse | { success: false; error: string }> => {
+    try {
+      const { period1, period2, region, size, offset, sortField, sortType } = args
+      const params = new URLSearchParams()
+      if (period1) params.append("period1", period1)
+      if (period2) params.append("period2", period2)
+      if (region) params.append("region", region)
+      if (size) params.append("size", size.toString())
+      if (offset) params.append("offset", offset.toString())
+      if (sortField) params.append("sortField", sortField)
+      if (sortType) params.append("sortType", sortType)
+      const response = await fetch(`/api/stock/earnings-calendar?${params.toString()}`)
+      if (!response.ok) throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching earnings calendar:", error)
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error fetching earnings calendar" }
+    }
+  }, []);
+
+  const fetchTrendingTickers = useCallback(async (args: any): Promise<ApiStockChartResponse | { success: false; error: string }> => {
+    try {
+      const { region, lang } = args
+      const params = new URLSearchParams()
+      if (region) params.append("region", region)
+      if (lang) params.append("lang", lang)
+      const response = await fetch(`/api/market/trending-tickers?${params.toString()}`)
+      if (!response.ok) throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching trending tickers:", error)
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error fetching trending tickers" }
+    }
+  }, []);
+
   // Define stopAssistant before it's used in handleFunctionCall
   const stopAssistant = useCallback(() => {
     if (peerConnectionRef.current) {
@@ -245,6 +377,10 @@ export default function Home() {
       if (msg.name === "getStockChart") {
         setIsLoading(true)
         setShowComponents(false);
+        // Clear other content types
+        setProfileData(null);
+        setStatisticsData(null);
+
         apiResponse = await fetchStockChart(args)
         if (apiResponse.success && apiResponse.chartData) {
           const newChartData = apiResponse.chartData;
@@ -259,15 +395,16 @@ export default function Home() {
           setComparisonStocks(newComparisonStocks);
 
           // Add to history
-          setChartHistory(prevHistory => {
-            const newEntry: ChartHistoryItem = {
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "chart",
+              symbol: newMainStock,
               chartData: newChartData,
               mainStock: newMainStock,
               selectedStock: newSelectedStock,
               comparisonStocks: newComparisonStocks,
-              viewMode: currentChartView, // Capture current view mode
+              viewMode: currentChartView,
             };
-            // Simple history: add to end, could be improved (e.g., limit size)
             const updatedHistory = [...prevHistory, newEntry];
             setCurrentHistoryIndex(updatedHistory.length - 1);
             return updatedHistory;
@@ -280,11 +417,203 @@ export default function Home() {
         }
         setIsLoading(false)
       } else if (msg.name === "getStockProfile") {
+        setIsLoading(true)
+        setShowComponents(false);
+        // Clear other content types
+        setChartData(null);
+        setStatisticsData(null);
+
         apiResponse = await fetchStockProfile(args)
-        if (apiResponse && !apiResponse.success) toast({ title: "Error fetching profile", description: apiResponse.error, variant: "destructive" });
+        if (apiResponse && apiResponse.success && (apiResponse as any).profileData) {
+          const newProfileData = (apiResponse as any).profileData;
+          setProfileData(newProfileData)
+          setProfileSymbol(args.symbol)
+
+          // Add to history
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "profile",
+              symbol: args.symbol,
+              profileData: newProfileData,
+            };
+            const updatedHistory = [...prevHistory, newEntry];
+            setCurrentHistoryIndex(updatedHistory.length - 1);
+            return updatedHistory;
+          });
+
+          setTimeout(() => setShowComponents(true), 100);
+        } else if (apiResponse && !apiResponse.success) {
+          toast({ title: "Error fetching profile", description: apiResponse.error, variant: "destructive" });
+          setProfileData(null)
+        }
+        setIsLoading(false)
       } else if (msg.name === "getStockStatistics") {
+        setIsLoading(true)
+        setShowComponents(false);
+        // Clear other content types
+        setChartData(null);
+        setProfileData(null);
+
         apiResponse = await fetchStockStatistics(args)
-        if (apiResponse && !apiResponse.success) toast({ title: "Error fetching statistics", description: apiResponse.error, variant: "destructive" });
+        if (apiResponse && apiResponse.success && (apiResponse as any).statisticsData) {
+          const newStatisticsData = (apiResponse as any).statisticsData;
+          setStatisticsData(newStatisticsData)
+          setStatisticsSymbol(args.symbol)
+
+          // Add to history
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "statistics",
+              symbol: args.symbol,
+              statisticsData: newStatisticsData,
+            };
+            const updatedHistory = [...prevHistory, newEntry];
+            setCurrentHistoryIndex(updatedHistory.length - 1);
+            return updatedHistory;
+          });
+
+          setTimeout(() => setShowComponents(true), 100);
+        } else if (apiResponse && !apiResponse.success) {
+          toast({ title: "Error fetching statistics", description: apiResponse.error, variant: "destructive" });
+          setStatisticsData(null)
+        }
+        setIsLoading(false)
+      } else if (msg.name === "getStockAnalysis") {
+        setIsLoading(true)
+        setShowComponents(false);
+        // Clear other content types
+        setChartData(null);
+        setProfileData(null);
+        setStatisticsData(null);
+
+        apiResponse = await fetchStockAnalysis(args)
+        if (apiResponse && apiResponse.success && (apiResponse as any).analysisData) {
+          const newAnalysisData = (apiResponse as any).analysisData;
+          setAnalysisData(newAnalysisData)
+          setAnalysisSymbol(args.symbol)
+
+          // Add to history
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "analysis",
+              symbol: args.symbol,
+              analysisData: newAnalysisData,
+            };
+            const updatedHistory = [...prevHistory, newEntry];
+            setCurrentHistoryIndex(updatedHistory.length - 1);
+            return updatedHistory;
+          });
+
+          setTimeout(() => setShowComponents(true), 100);
+        } else if (apiResponse && !apiResponse.success) {
+          toast({ title: "Error fetching analysis", description: apiResponse.error, variant: "destructive" });
+          setAnalysisData(null)
+        }
+        setIsLoading(false)
+      } else if (msg.name === "getStockRecommendationTrend") {
+        setIsLoading(true)
+        setShowComponents(false);
+        // Clear other content types
+        setChartData(null);
+        setProfileData(null);
+        setStatisticsData(null);
+        setAnalysisData(null);
+
+        apiResponse = await fetchStockRecommendationTrend(args)
+        if (apiResponse && apiResponse.success && (apiResponse as any).recommendationTrendData) {
+          const newRecommendationTrendData = (apiResponse as any).recommendationTrendData;
+          setRecommendationTrendData(newRecommendationTrendData)
+          setRecommendationTrendSymbol(args.symbol)
+
+          // Add to history
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "recommendation-trend",
+              symbol: args.symbol,
+              recommendationTrendData: newRecommendationTrendData,
+            };
+            const updatedHistory = [...prevHistory, newEntry];
+            setCurrentHistoryIndex(updatedHistory.length - 1);
+            return updatedHistory;
+          });
+
+          setTimeout(() => setShowComponents(true), 100);
+        } else if (apiResponse && !apiResponse.success) {
+          toast({ title: "Error fetching recommendation trend", description: apiResponse.error, variant: "destructive" });
+          setRecommendationTrendData(null)
+        }
+        setIsLoading(false)
+      } else if (msg.name === "getEarningsCalendar") {
+        setIsLoading(true)
+        setShowComponents(false);
+        // Clear other content types
+        setChartData(null);
+        setProfileData(null);
+        setStatisticsData(null);
+        setAnalysisData(null);
+        setRecommendationTrendData(null);
+
+        apiResponse = await fetchEarningsCalendar(args)
+        if (apiResponse && apiResponse.success && (apiResponse as any).earningsCalendarData) {
+          const newEarningsCalendarData = (apiResponse as any).earningsCalendarData;
+          setEarningsCalendarData(newEarningsCalendarData)
+          setEarningsCalendarDateRange({ period1: args.period1, period2: args.period2 })
+
+          // Add to history
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "earnings-calendar",
+              symbol: "", // Calendar doesn't have a single symbol
+              earningsCalendarData: newEarningsCalendarData,
+              earningsCalendarDateRange: { period1: args.period1, period2: args.period2 },
+            };
+            const updatedHistory = [...prevHistory, newEntry];
+            setCurrentHistoryIndex(updatedHistory.length - 1);
+            return updatedHistory;
+          });
+
+          setTimeout(() => setShowComponents(true), 100);
+        } else if (apiResponse && !apiResponse.success) {
+          toast({ title: "Error fetching earnings calendar", description: apiResponse.error, variant: "destructive" });
+          setEarningsCalendarData(null)
+        }
+        setIsLoading(false)
+      } else if (msg.name === "getTrendingTickers") {
+        setIsLoading(true)
+        setShowComponents(false);
+        // Clear other content types
+        setChartData(null);
+        setProfileData(null);
+        setStatisticsData(null);
+        setAnalysisData(null);
+        setRecommendationTrendData(null);
+        setEarningsCalendarData(null);
+
+        apiResponse = await fetchTrendingTickers(args)
+        if (apiResponse && apiResponse.success && (apiResponse as any).trendingTickersData) {
+          const newTrendingTickersData = (apiResponse as any).trendingTickersData;
+          setTrendingTickersData(newTrendingTickersData)
+          setTrendingTickersRegion(args.region || "US")
+
+          // Add to history
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "trending-tickers",
+              symbol: "", // Trending tickers doesn't have a single symbol
+              trendingTickersData: newTrendingTickersData,
+              trendingTickersRegion: args.region || "US",
+            };
+            const updatedHistory = [...prevHistory, newEntry];
+            setCurrentHistoryIndex(updatedHistory.length - 1);
+            return updatedHistory;
+          });
+
+          setTimeout(() => setShowComponents(true), 100);
+        } else if (apiResponse && !apiResponse.success) {
+          toast({ title: "Error fetching trending tickers", description: apiResponse.error, variant: "destructive" });
+          setTrendingTickersData(null)
+        }
+        setIsLoading(false)
       } else if (msg.name === "muteAssistant") {
         // Allow the assistant to end the conversation
         stopAssistant();
@@ -325,7 +654,7 @@ export default function Home() {
          dataChannelRef.current.send(JSON.stringify({ type: "response.create" }))
       }
     }
-  }, [toast, fetchStockChart, fetchStockProfile, fetchStockStatistics, stopAssistant]);
+  }, [toast, fetchStockChart, fetchStockProfile, fetchStockStatistics, fetchStockAnalysis, fetchStockRecommendationTrend, fetchEarningsCalendar, fetchTrendingTickers, stopAssistant]);
 
   const configureDataChannel = useCallback((dataChannel: RTCDataChannel) => {
     const event = {
@@ -388,6 +717,63 @@ export default function Home() {
           },
           {
             type: "function",
+            name: "getStockAnalysis",
+            description: "Fetches comprehensive analyst analysis including recommendations, earnings estimates, price targets, and upgrade/downgrade history for a stock",
+            parameters: {
+              type: "object",
+              properties: {
+                symbol: { type: "string", description: "Stock symbol (e.g., GOOG, AAPL)" },
+                region: { type: "string", description: "Region code (e.g., US)" },
+              },
+              required: ["symbol"],
+            },
+          },
+          {
+            type: "function",
+            name: "getStockRecommendationTrend",
+            description: "Fetches historical analyst recommendation trends showing how Buy/Hold/Sell ratings have changed over time (current, 1 month ago, 2 months ago, 3 months ago)",
+            parameters: {
+              type: "object",
+              properties: {
+                symbol: { type: "string", description: "Stock symbol (e.g., GOOG, AAPL)" },
+                region: { type: "string", description: "Region code (e.g., US)" },
+              },
+              required: ["symbol"],
+            },
+          },
+          {
+            type: "function",
+            name: "getEarningsCalendar",
+            description: "Fetches earnings calendar showing upcoming and recent earnings events. Intelligently interprets user requests like 'next week', 'this month', 'upcoming earnings' and converts them to specific date ranges. Shows company names, tickers, earnings dates/times, EPS estimates, actual EPS, and surprise percentages.",
+            parameters: {
+              type: "object",
+              properties: {
+                period1: { type: "string", description: "Start date in YYYY-MM-DD format (e.g., 2024-10-01). Interpret user intent: 'next week' = today to +7 days, 'this month' = first day to last day of current month, 'upcoming' = today to +14 days" },
+                period2: { type: "string", description: "End date in YYYY-MM-DD format (e.g., 2024-10-31). Should be after period1." },
+                region: { type: "string", description: "Region code (default: US). Options: US, GB, AU, etc." },
+                size: { type: "number", description: "Number of events to return (default: 100, max: 250)" },
+                offset: { type: "number", description: "Pagination offset (default: 0)" },
+                sortField: { type: "string", description: "Field to sort by (default: startdatetime). Options: startdatetime, companyshortname" },
+                sortType: { type: "string", description: "Sort order (default: ASC). Options: ASC, DESC" },
+              },
+              required: [],
+            },
+          },
+          {
+            type: "function",
+            name: "getTrendingTickers",
+            description: "Fetches currently trending stock tickers in the market. Shows stocks with high trading activity, significant price movements, and high investor interest. Displays price, change percentage, market state, and trending score for each ticker. Great for discovering what's hot in the market right now.",
+            parameters: {
+              type: "object",
+              properties: {
+                region: { type: "string", description: "Region code (default: US). Options: US, GB, AU, IN, etc." },
+                lang: { type: "string", description: "Language code (default: en-US)" },
+              },
+              required: [],
+            },
+          },
+          {
+            type: "function",
             name: "muteAssistant",
             description: "Allows the assistant to end the current conversation",
             parameters: {
@@ -415,6 +801,9 @@ export default function Home() {
       });
       return;
     }
+
+    // Clear previous session history when starting a new session
+    await clearConversationHistory();
 
     setIsListening(true);
     try {
@@ -448,12 +837,15 @@ export default function Home() {
           // Complete the current message
           setCurrentLlmMessage(current => {
             const finalMessage = current + (msg.delta || "");
-            
+
             // Store this in our ref for deduplication
             lastMessageRef.current = finalMessage;
-            
+
             // Only add to history if it's not empty
             if (finalMessage.trim()) {
+              // Save to persistent storage
+              saveConversationMessage("assistant", finalMessage);
+
               // Add to history using the functional update to avoid race conditions
               setLlmResponseHistory(prevHistory => {
                 // Check if this message is already in history to prevent duplicates
@@ -464,7 +856,7 @@ export default function Home() {
                 return [...prevHistory, finalMessage];
               });
             }
-            
+
             // Clear the current message since it's now in history
             return "";
           });
@@ -541,6 +933,8 @@ export default function Home() {
             };
             dataChannelRef.current.send(JSON.stringify(event));
             dataChannelRef.current.send(JSON.stringify({ type: "response.create" }));
+            // Save user message to history
+            saveConversationMessage("user", prompt);
             toast({ title: "Prompt Sent", description: `Sent: "${prompt}"` });
           } else {
             toast({ title: "Assistant Not Ready", description: "Could not send prompt. Please try again.", variant: "destructive"});
@@ -554,52 +948,85 @@ export default function Home() {
       };
       dataChannelRef.current.send(JSON.stringify(event));
       dataChannelRef.current.send(JSON.stringify({ type: "response.create" }));
+      // Save user message to history
+      saveConversationMessage("user", prompt);
       toast({ title: "Prompt Sent", description: `Sent: "${prompt}"` });
     } else {
         toast({ title: "Assistant Not Ready", description: "Could not send prompt. Please try again.", variant: "destructive"});
     }
   };
 
-  // Function to navigate chart history
+  // Function to navigate content history (charts, profiles, statistics)
   const navigateToHistory = (index: number) => {
-    if (index >= 0 && index < chartHistory.length) {
+    if (index >= 0 && index < contentHistory.length) {
       // Determine slide direction based on index change
       if (index > currentHistoryIndex) {
-        setSlideDirection('left'); // Newer chart, slide from right to left
+        setSlideDirection('left'); // Newer content, slide from right to left
       } else if (index < currentHistoryIndex) {
-        setSlideDirection('right'); // Older chart, slide from left to right
+        setSlideDirection('right'); // Older content, slide from left to right
       } else {
-        setSlideDirection('none'); // Same chart, no slide
+        setSlideDirection('none'); // Same content, no slide
       }
-  
-      setShowComponents(false); // Hide components to re-trigger animation
-      const historyItem = chartHistory[index];
-      
+
+      setShowComponents(false); // Hide components for smooth transition
+      const historyItem = contentHistory[index];
+
       setTimeout(() => {
-        setChartData(historyItem.chartData);
-        setMainStock(historyItem.mainStock);
-        setSelectedStock(historyItem.selectedStock);
-        setComparisonStocks(historyItem.comparisonStocks);
-        setCurrentChartView(historyItem.viewMode);
+        // Clear all states first
+        setChartData(null);
+        setProfileData(null);
+        setStatisticsData(null);
+        setAnalysisData(null);
+        setRecommendationTrendData(null);
+        setEarningsCalendarData(null);
+        setTrendingTickersData(null);
+
+        // Restore based on content type
+        if (historyItem.type === "chart") {
+          setChartData(historyItem.chartData || null);
+          setMainStock(historyItem.mainStock || "");
+          setSelectedStock(historyItem.selectedStock || "");
+          setComparisonStocks(historyItem.comparisonStocks || []);
+          setCurrentChartView(historyItem.viewMode || "price");
+        } else if (historyItem.type === "profile") {
+          setProfileData(historyItem.profileData);
+          setProfileSymbol(historyItem.symbol);
+        } else if (historyItem.type === "statistics") {
+          setStatisticsData(historyItem.statisticsData);
+          setStatisticsSymbol(historyItem.symbol);
+        } else if (historyItem.type === "analysis") {
+          setAnalysisData(historyItem.analysisData);
+          setAnalysisSymbol(historyItem.symbol);
+        } else if (historyItem.type === "recommendation-trend") {
+          setRecommendationTrendData(historyItem.recommendationTrendData);
+          setRecommendationTrendSymbol(historyItem.symbol);
+        } else if (historyItem.type === "earnings-calendar") {
+          setEarningsCalendarData(historyItem.earningsCalendarData);
+          setEarningsCalendarDateRange(historyItem.earningsCalendarDateRange || {});
+        } else if (historyItem.type === "trending-tickers") {
+          setTrendingTickersData(historyItem.trendingTickersData);
+          setTrendingTickersRegion(historyItem.trendingTickersRegion || "US");
+        }
+
         setCurrentHistoryIndex(index);
         setShowComponents(true); // Show components to trigger animation
-      }, 50); // Small delay, adjust if needed
+      }, 50); // Small delay for smooth transition
     }
   };
 
-  // Handle navigation to previous chart
+  // Handle navigation to previous content
   const navigateToPrevious = useCallback(() => {
     if (currentHistoryIndex > 0) {
       navigateToHistory(currentHistoryIndex - 1);
     }
   }, [currentHistoryIndex]);
 
-  // Handle navigation to next chart
+  // Handle navigation to next content
   const navigateToNext = useCallback(() => {
-    if (currentHistoryIndex < chartHistory.length - 1) {
+    if (currentHistoryIndex < contentHistory.length - 1) {
       navigateToHistory(currentHistoryIndex + 1);
     }
-  }, [currentHistoryIndex, chartHistory.length]);
+  }, [currentHistoryIndex, contentHistory.length]);
 
   // Touch event handlers for swipe gestures
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -607,24 +1034,24 @@ export default function Home() {
   }, []);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (touchStartXRef.current === null || chartHistory.length <= 1) return;
-    
+    if (touchStartXRef.current === null || contentHistory.length <= 1) return;
+
     const touchEndX = e.changedTouches[0].clientX;
     const diffX = touchEndX - touchStartXRef.current;
-    
+
     // Minimum swipe distance threshold (adjust as needed)
     const minSwipeDistance = 50;
-    
+
     if (diffX > minSwipeDistance) {
-      // Swipe right -> Previous chart
+      // Swipe right -> Previous content
       navigateToPrevious();
     } else if (diffX < -minSwipeDistance) {
-      // Swipe left -> Next chart
+      // Swipe left -> Next content
       navigateToNext();
     }
-    
+
     touchStartXRef.current = null;
-  }, [navigateToPrevious, navigateToNext, chartHistory.length]);
+  }, [navigateToPrevious, navigateToNext, contentHistory.length]);
 
   // Add this to the main function to include the CSS animation
   useEffect(() => {
@@ -649,65 +1076,208 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-background flex flex-col overflow-hidden">
-      <header className="relative border-b border-border/20 py-4 px-6 flex justify-between items-center backdrop-blur-xl bg-white/10 dark:bg-black/10 before:absolute before:inset-0 before:bg-gradient-to-r before:from-white/5 before:via-transparent before:to-white/5 before:backdrop-blur-xl before:-z-10 after:absolute after:inset-0 after:bg-gradient-to-b after:from-white/20 after:via-transparent after:to-transparent after:backdrop-blur-sm after:-z-10 shadow-lg shadow-black/5 dark:shadow-white/5">
-        {/* Liquid Glass overlay with specular highlights */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-white/10 dark:from-white/10 dark:via-transparent dark:to-white/5 pointer-events-none"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-transparent via-white/5 to-white/20 dark:from-transparent dark:via-white/2 dark:to-white/10 pointer-events-none"></div>
-        
-        {/* Animated specular highlights */}
-        <div className="absolute top-0 left-1/4 w-32 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent animate-pulse pointer-events-none"></div>
-        <div className="absolute bottom-0 right-1/3 w-24 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent animate-pulse delay-1000 pointer-events-none"></div>
-        
-        {/* Content with proper z-index */}
-        <div className="relative z-10 flex items-center">
-          <h1 className="text-2xl font-bold flex items-center text-foreground/90 backdrop-blur-sm">
-            Portfolio A<span className="relative">I
-            <AutoAwesomeIcon className="absolute -top-2 -right-4 h-2 w-2" />
-            </span>
+      <header className="border-b border-border py-3 px-6 flex justify-between items-center bg-background">
+        <div className="flex items-center gap-3">
+          <Image
+            src="/portfolio_ai_logo.png"
+            alt="Portfolio AI Logo"
+            width={40}
+            height={40}
+            className="rounded-md"
+          />
+          <h1 className="text-xl font-semibold text-foreground">
+            Portfolio AI
           </h1>
         </div>
-        
-        <div className="relative z-10">
-          <div className="p-1 rounded-xl bg-white/20 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/10 shadow-inner">
-            <ThemeToggle />
-          </div>
+
+        <div className="flex items-center gap-2">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="icon" aria-label="Help" style={{ borderColor: '#47befb' }}>
+                <HelpCircle className="h-[1.2rem] w-[1.2rem]" style={{ color: '#47befb' }} />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-2xl">About Portfolio AI Assistant</DialogTitle>
+                <DialogDescription>
+                  Learn what your AI-powered financial assistant can do
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-6 mt-4">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">How It Works</h3>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Portfolio AI is a voice-enabled financial assistant powered by Azure OpenAI's real-time API. Click the microphone sphere to start a voice conversation, or use the example prompts to see what it can do.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Get instant access to stock data from Yahoo Finance, including charts, company profiles, analyst insights, and trending tickers across global markets. All content is interactive - navigate through history, compare stocks, and click trending tickers to explore.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Available Tools & Capabilities</h3>
+                  <div className="space-y-4">
+                    <div className="border border-border rounded-lg p-4 bg-muted/30">
+                      <div className="flex items-start gap-3">
+                        <BarChart4 className="h-5 w-5 mt-0.5 text-primary" />
+                        <div>
+                          <h4 className="font-semibold text-sm">Stock Charts</h4>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            View historical price data, compare multiple stocks, and analyze trends with customizable time ranges (1d, 1mo, 1y, etc.) and intervals.
+                          </p>
+                          <p className="text-xs text-primary mt-2 italic">
+                            Example: "Show me Apple's stock price for the last 3 months"
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border border-border rounded-lg p-4 bg-muted/30">
+                      <div className="flex items-start gap-3">
+                        <Info className="h-5 w-5 mt-0.5 text-primary" />
+                        <div>
+                          <h4 className="font-semibold text-sm">Company Profiles</h4>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Get detailed company information including sector, industry, location, employees, leadership, and business description.
+                          </p>
+                          <p className="text-xs text-primary mt-2 italic">
+                            Example: "Tell me about NVIDIA's company profile"
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border border-border rounded-lg p-4 bg-muted/30">
+                      <div className="flex items-start gap-3">
+                        <BarChart4 className="h-5 w-5 mt-0.5 text-primary" />
+                        <div>
+                          <h4 className="font-semibold text-sm">Key Statistics</h4>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Access financial metrics like P/E ratio, market cap, beta, profit margins, and growth rates.
+                          </p>
+                          <p className="text-xs text-primary mt-2 italic">
+                            Example: "What are the key stats for Microsoft?"
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border border-border rounded-lg p-4 bg-muted/30">
+                      <div className="flex items-start gap-3">
+                        <Sparkles className="h-5 w-5 mt-0.5 text-primary" />
+                        <div>
+                          <h4 className="font-semibold text-sm">Analyst Analysis</h4>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            View comprehensive analyst recommendations, earnings estimates, price targets, and upgrade/downgrade history.
+                          </p>
+                          <p className="text-xs text-primary mt-2 italic">
+                            Example: "Show me analyst recommendations for Tesla"
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border border-border rounded-lg p-4 bg-muted/30">
+                      <div className="flex items-start gap-3">
+                        <BarChart4 className="h-5 w-5 mt-0.5 text-primary" />
+                        <div>
+                          <h4 className="font-semibold text-sm">Recommendation Trends</h4>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Track how analyst recommendations (Buy/Hold/Sell) have changed over time for any stock.
+                          </p>
+                          <p className="text-xs text-primary mt-2 italic">
+                            Example: "What's the recommendation trend for Amazon?"
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border border-border rounded-lg p-4 bg-muted/30">
+                      <div className="flex items-start gap-3">
+                        <Info className="h-5 w-5 mt-0.5 text-primary" />
+                        <div>
+                          <h4 className="font-semibold text-sm">Earnings Calendar</h4>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            View upcoming and recent earnings events with dates, EPS estimates, actual results, and surprise percentages.
+                          </p>
+                          <p className="text-xs text-primary mt-2 italic">
+                            Example: "Show me upcoming earnings this week"
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border border-border rounded-lg p-4 bg-muted/30">
+                      <div className="flex items-start gap-3">
+                        <TrendingUp className="h-5 w-5 mt-0.5 text-primary" />
+                        <div>
+                          <h4 className="font-semibold text-sm">Trending Tickers</h4>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Discover what stocks are trending with high trading activity across global markets. Click any ticker to instantly view its chart.
+                          </p>
+                          <p className="text-xs text-primary mt-2 italic">
+                            Example: "What stocks are trending today?"
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Tips & Features</h3>
+                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                    <li>Use natural language - just ask questions like you would to a financial advisor</li>
+                    <li>Compare multiple stocks by mentioning them together in one query</li>
+                    <li>Navigate through your query history using the arrows, dot indicators, or swipe gestures</li>
+                    <li>Switch between price, percent change, and relative performance views on charts</li>
+                    <li>Click any trending ticker card to instantly load its detailed chart and information</li>
+                    <li>Ask about global markets - supports US, GB, AU, IN, and many other regions</li>
+                  </ul>
+                </div>
+
+                <div className="pt-4 border-t border-border mt-6">
+                  <p className="text-xs text-center text-muted-foreground">
+                    Built by <span className="font-medium text-foreground">Kabeer Thockchom</span>
+                  </p>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <ThemeToggle />
         </div>
       </header>
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className={`border-r border-border/20 transition-all duration-300 bg-white/5 dark:bg-black/5 backdrop-blur-xl ${isSidebarCollapsed ? 'w-12' : 'w-80'} flex flex-col relative`}>
-          {/* Liquid Glass overlay for sidebar */}
-          <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-white/5 to-transparent dark:from-white/5 dark:via-white/2 dark:to-transparent pointer-events-none"></div>
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent dark:from-transparent dark:via-white/2 dark:to-transparent pointer-events-none"></div>
-          
-          <div className="relative z-10 flex justify-end p-2">
-            <div className="p-1 rounded-lg bg-white/20 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/10">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                className="hover:bg-white/20 dark:hover:bg-white/10 transition-colors"
-              >
-                {isSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-              </Button>
-            </div>
+        <aside className={`border-r border-border transition-all duration-300 ${isSidebarCollapsed ? 'w-12' : 'w-80'} flex flex-col bg-card`}>
+          <div className="flex justify-end p-3 border-b border-border">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {isSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </Button>
           </div>
-          
+
           {/* Sidebar content */}
-          <div className={`relative z-10 flex-1 flex flex-col p-4 ${isSidebarCollapsed ? 'hidden' : ''}`}>
+          <div className={`flex-1 flex flex-col p-4 ${isSidebarCollapsed ? 'hidden' : ''}`}>
             {/* Audio Visualizer */}
             <div className="flex flex-col items-center justify-center mb-6">
-              <div className="p-2 rounded-2xl bg-white/10 dark:bg-black/10 backdrop-blur-md border border-white/30 dark:border-white/10 shadow-lg">
-                <AudioSphereVisualizer 
+              <div className="p-3 rounded-xl border border-border bg-muted/30">
+                <AudioSphereVisualizer
                   isAssistantListening={isListening}
                   llmAudioElementRef={audioElementRef}
                   onStartAssistant={startAssistant}
                   onStopAssistant={stopAssistant}
-                  canvasClassName="w-36 h-36 md:w-40 md:h-40 cursor-pointer" 
+                  canvasClassName="w-32 h-32 md:w-36 md:h-36 cursor-pointer"
                 />
               </div>
-              <p className="text-xs text-muted-foreground mt-2 backdrop-blur-sm bg-white/10 dark:bg-black/10 px-2 py-1 rounded-md border border-white/20 dark:border-white/10">
+              <p className="text-xs text-muted-foreground mt-3 text-center">
                 {isListening
                   ? "Tap to mute"
                   : mounted && rtcHelpers
@@ -716,54 +1286,48 @@ export default function Home() {
               </p>
               <audio ref={audioElementRef} autoPlay className="hidden" />
             </div>
-            
+
             {/* Chat Transcript */}
-            <div className="flex flex-col mb-6 h-[40vh]">
-              <div className="relative flex items-center mb-2 h-6">
-                <p className="text-sm font-medium backdrop-blur-sm bg-white/10 dark:bg-black/10 px-2 py-1 rounded-md border border-white/20 dark:border-white/10">
-                  Transcript
-                </p>
-              </div>
-              <div className="overflow-y-auto flex-1 space-y-2 border border-white/20 dark:border-white/10 rounded-lg p-3 backdrop-blur-md bg-white/5 dark:bg-black/5">
+            <div className="flex flex-col mb-4 flex-1 min-h-0">
+              <p className="text-sm font-medium mb-2 text-foreground">
+                Transcript
+              </p>
+              <div className="overflow-y-auto flex-1 space-y-2 border border-border rounded-lg p-3 bg-muted/30">
                 {llmResponseHistory.map((text, index) => (
-                  <div key={index} className="text-sm text-muted-foreground p-2 bg-white/10 dark:bg-black/10 rounded-md backdrop-blur-sm border border-white/20 dark:border-white/10">
-                    {text}
+                  <div key={index} className="text-sm text-muted-foreground p-2 bg-background rounded-md border border-border prose prose-sm dark:prose-invert max-w-none">
+                    <ReactMarkdown>{text}</ReactMarkdown>
                   </div>
                 ))}
                 {currentLlmMessage && (
-                  <div className="text-sm text-foreground p-2 bg-primary/20 rounded-md animate-pulse backdrop-blur-sm border border-primary/30">
-                    {currentLlmMessage}
+                  <div className="text-sm text-foreground p-2 bg-primary/10 rounded-md border border-primary/30 prose prose-sm dark:prose-invert max-w-none">
+                    <ReactMarkdown>{currentLlmMessage}</ReactMarkdown>
                   </div>
                 )}
                 {(llmResponseHistory.length === 0 && !currentLlmMessage) && (
-                  <p className="text-xs text-muted-foreground text-center">Assistant responses will appear here.</p>
+                  <p className="text-xs text-muted-foreground text-center py-4">Assistant responses will appear here.</p>
                 )}
               </div>
             </div>
-            
+
             {/* Example Prompts */}
-            <div className="mt-auto">
-              <div className="relative flex items-center mb-2 h-6">
-                <p className="text-sm font-medium backdrop-blur-sm bg-white/10 dark:bg-black/10 px-2 py-1 rounded-md border border-white/20 dark:border-white/10">
-                  Example Prompts
-                </p>
-              </div>
-              <TypewriterBadges 
-                prompts={examplePrompts} 
-                onBadgeClick={handlePromptClick} 
-                containerClassName="flex flex-col gap-2" 
-                badgeClassName="bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 text-muted-foreground cursor-pointer transition-colors text-sm py-1.5 px-3 w-full text-left backdrop-blur-md border border-white/20 dark:border-white/10 rounded-lg"
+            <div>
+              <p className="text-sm font-medium mb-2 text-foreground">
+                Example Prompts
+              </p>
+              <TypewriterBadges
+                prompts={examplePrompts}
+                onBadgeClick={handlePromptClick}
+                containerClassName="flex flex-col gap-2"
+                badgeClassName="bg-muted hover:bg-muted/80 text-foreground cursor-pointer transition-colors text-xs py-2 px-3 w-full text-left border border-border rounded-lg"
               />
             </div>
           </div>
-          
+
           {/* Collapsed state only shows icons */}
-          <div className={`relative z-10 flex-1 flex flex-col items-center py-4 ${!isSidebarCollapsed ? 'hidden' : ''}`}>
-            <div className="p-1 rounded-lg bg-white/20 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/10">
-              <Button variant="ghost" size="icon" onClick={() => setIsSidebarCollapsed(false)} className="mb-4 hover:bg-white/20 dark:hover:bg-white/10">
-                <Mic className={`h-5 w-5 ${isListening ? 'text-primary' : 'text-muted-foreground'}`} />
-              </Button>
-            </div>
+          <div className={`flex-1 flex flex-col items-center py-4 ${!isSidebarCollapsed ? 'hidden' : ''}`}>
+            <Button variant="ghost" size="icon" onClick={() => setIsSidebarCollapsed(false)} className="mb-4">
+              <Mic className={`h-5 w-5 ${isListening ? 'text-primary' : 'text-muted-foreground'}`} />
+            </Button>
           </div>
         </aside>
         
@@ -775,100 +1339,89 @@ export default function Home() {
           onTouchEnd={handleTouchEnd}
         >
           <div className="max-w-6xl mx-auto space-y-6">
-            {/* Chart History Navigation */}
-            {chartHistory.length > 1 && (
-              <div className="flex items-center justify-center gap-4 mb-4">
-                <div className="p-1 rounded-lg bg-white/10 dark:bg-black/10 backdrop-blur-md border border-white/20 dark:border-white/10">
-                  <Button 
-                    variant="outline" 
-                    size="icon"
-                    onClick={navigateToPrevious}
-                    disabled={currentHistoryIndex <= 0}
-                    aria-label="Previous chart"
-                    className="bg-white/10 dark:bg-black/10 border-white/20 dark:border-white/10 hover:bg-white/20 dark:hover:bg-black/20"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                </div>
-                
-                <div className="flex space-x-2 p-2 rounded-lg bg-white/10 dark:bg-black/10 backdrop-blur-md border border-white/20 dark:border-white/10">
-                  {chartHistory.map((_, index) => (
-                    <button 
-                      key={`dot-${index}`} 
+            {/* Content History Navigation */}
+            {contentHistory.length > 1 && (
+              <div className="flex items-center justify-center gap-3 mb-6">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={navigateToPrevious}
+                  disabled={currentHistoryIndex <= 0}
+                  aria-label="Previous content"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                <div className="flex space-x-2">
+                  {contentHistory.map((_, index) => (
+                    <button
+                      key={`dot-${index}`}
                       onClick={() => navigateToHistory(index)}
-                      className={`h-3 w-3 rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-1 focus:ring-yellow-500/70 ${
-                        currentHistoryIndex === index ? 'bg-yellow-400 scale-110 shadow-lg shadow-yellow-400/50' : 'bg-white/30 dark:bg-white/20 hover:bg-white/50 dark:hover:bg-white/30'
+                      className={`h-2 w-2 rounded-full transition-all duration-200 ${
+                        currentHistoryIndex === index ? 'bg-primary w-6' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
                       }`}
-                      aria-label={`View chart ${index + 1}`}
+                      aria-label={`View content ${index + 1}`}
                     />
                   ))}
                 </div>
-                
-                <div className="p-1 rounded-lg bg-white/10 dark:bg-black/10 backdrop-blur-md border border-white/20 dark:border-white/10">
-                  <Button 
-                    variant="outline" 
-                    size="icon"
-                    onClick={navigateToNext}
-                    disabled={currentHistoryIndex >= chartHistory.length - 1}
-                    aria-label="Next chart"
-                    className="bg-white/10 dark:bg-black/10 border-white/20 dark:border-white/10 hover:bg-white/20 dark:hover:bg-black/20"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
+
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={navigateToNext}
+                  disabled={currentHistoryIndex >= contentHistory.length - 1}
+                  aria-label="Next content"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
             )}
             
-            {/* Stock Visualization Card */}
+            {/* Main Content Card - Shows Chart, Profile, Statistics, or Analysis */}
             <div
               className={`transition-all duration-700 ease-out ${
-                showComponents && chartData 
-                  ? "opacity-100 " + 
-                    (slideDirection === 'left' 
-                      ? 'animate-slide-in-from-right' 
-                      : slideDirection === 'right' 
-                        ? 'animate-slide-in-from-left' 
+                showComponents && (chartData || profileData || statisticsData || analysisData || recommendationTrendData || earningsCalendarData)
+                  ? "opacity-100 " +
+                    (slideDirection === 'left'
+                      ? 'animate-slide-in-from-right'
+                      : slideDirection === 'right'
+                        ? 'animate-slide-in-from-left'
                         : 'translate-y-0')
-                  : "opacity-0 " + 
-                    (slideDirection === 'left' 
-                      ? 'translate-x-full' 
-                      : slideDirection === 'right' 
-                        ? '-translate-x-full' 
+                  : "opacity-0 " +
+                    (slideDirection === 'left'
+                      ? 'translate-x-full'
+                      : slideDirection === 'right'
+                        ? '-translate-x-full'
                         : 'translate-y-8')
               }`}
             >
-              <Card className="border-white/20 dark:border-white/10 bg-white/5 dark:bg-black/5 backdrop-blur-xl relative overflow-hidden">
-                {/* Liquid Glass overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-white/10 dark:from-white/10 dark:via-transparent dark:to-white/5 pointer-events-none"></div>
-                <div className="absolute inset-0 bg-gradient-to-t from-transparent via-white/5 to-white/15 dark:from-transparent dark:via-white/2 dark:to-white/8 pointer-events-none"></div>
-                
-                <CardContent className="relative z-10 p-6">
+              {/* Show Chart */}
+              {chartData && (
+              <Card className="border-border">
+                <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold">Stock Visualization</h2>
-                    <div className="flex items-center gap-2">
-                      <div className="p-1 rounded-lg bg-white/20 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/10">
-                        <select
-                          id="chartView"
-                          className="px-3 py-2 rounded-md border-0 bg-white/10 dark:bg-black/10 text-foreground backdrop-blur-sm focus:ring-2 focus:ring-primary/50"
-                          value={currentChartView}
-                          onChange={(e) => setCurrentChartView(e.target.value as "price" | "percent" | "relative")}
-                        >
-                          <option value="price">Price</option>
-                          <option value="percent">Percent Change</option>
-                          <option value="relative">Relative Performance</option>
-                        </select>
-                      </div>
-                    </div>
+                    <h2 className="text-lg font-semibold">Stock Chart</h2>
+                    <select
+                      id="chartView"
+                      className="px-3 py-1.5 text-sm rounded-md border border-border bg-background text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none"
+                      value={currentChartView}
+                      onChange={(e) => setCurrentChartView(e.target.value as "price" | "percent" | "relative")}
+                    >
+                      <option value="price">Price</option>
+                      <option value="percent">Percent Change</option>
+                      <option value="relative">Relative Performance</option>
+                    </select>
                   </div>
 
                   {chartData && chartData.chart && chartData.chart.result && chartData.chart.result.length > 0 && (
-                    <div className="flex flex-wrap justify-between items-center mb-4 text-sm gap-2">
-                      <div className="bg-white/10 dark:bg-black/10 px-3 py-1 rounded-md backdrop-blur-sm border border-white/20 dark:border-white/10">
-                        <span className="font-medium">Interval:</span>{" "}
-                        {chartData.chart.result[0].meta.dataGranularity || "1d"}
+                    <div className="flex flex-wrap justify-between items-center mb-4 text-xs gap-2">
+                      <div className="bg-muted px-2.5 py-1 rounded-md border border-border">
+                        <span className="font-medium text-muted-foreground">Interval:</span>{" "}
+                        <span className="text-foreground">{chartData.chart.result[0].meta.dataGranularity || "1d"}</span>
                       </div>
-                      <div className="bg-white/10 dark:bg-black/10 px-3 py-1 rounded-md backdrop-blur-sm border border-white/20 dark:border-white/10">
-                        <span className="font-medium">Range:</span> {chartData.chart.result[0].meta.range || "1mo"}
+                      <div className="bg-muted px-2.5 py-1 rounded-md border border-border">
+                        <span className="font-medium text-muted-foreground">Range:</span>{" "}
+                        <span className="text-foreground">{chartData.chart.result[0].meta.range || "1mo"}</span>
                       </div>
                     </div>
                   )}
@@ -879,7 +1432,6 @@ export default function Home() {
                         variant={selectedStock === mainStock ? "default" : "outline"}
                         size="sm"
                         onClick={() => setSelectedStock(mainStock)}
-                        className="bg-primary/20 text-primary-foreground hover:bg-primary/30 backdrop-blur-sm border border-primary/30"
                       >
                         {mainStock}
                       </Button>
@@ -889,11 +1441,6 @@ export default function Home() {
                           variant={selectedStock === symbol ? "default" : "outline"}
                           size="sm"
                           onClick={() => setSelectedStock(symbol)}
-                          className={
-                            selectedStock === symbol 
-                              ? "bg-primary/20 text-primary-foreground hover:bg-primary/30 backdrop-blur-sm border border-primary/30" 
-                              : "bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 backdrop-blur-sm border border-white/20 dark:border-white/10"
-                          }
                         >
                           {symbol}
                         </Button>
@@ -907,7 +1454,7 @@ export default function Home() {
                   </div>
 
                   {!chartData && !isLoading && (
-                    <div className="flex flex-col items-center justify-center h-[300px] border border-dashed rounded-lg border-white/20 dark:border-white/10 bg-white/5 dark:bg-black/5 backdrop-blur-sm">
+                    <div className="flex flex-col items-center justify-center h-[300px] border border-dashed rounded-lg border-border bg-muted/30">
                       <BarChart4 className="w-10 h-10 text-muted-foreground mb-2" />
                       <p className="text-muted-foreground text-sm">Ask the assistant to show you a stock chart</p>
                     </div>
@@ -915,57 +1462,146 @@ export default function Home() {
 
                   {isLoading && (
                     <div id="loadingIndicator" className="flex flex-col items-center justify-center h-[300px]">
-                      <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-2"></div>
+                      <div className="w-10 h-10 border-4 border-muted border-t-primary rounded-full animate-spin mb-2"></div>
                       <p className="text-muted-foreground text-sm">Loading chart data...</p>
                     </div>
                   )}
                 </CardContent>
               </Card>
+              )}
+
+              {/* Show Profile */}
+              {profileData && !chartData && (
+                <StockProfileCard profileData={profileData} symbol={profileSymbol} />
+              )}
+
+              {/* Show Statistics */}
+              {statisticsData && !chartData && !profileData && !analysisData && !recommendationTrendData && !earningsCalendarData && (
+                <StockStatisticsCard statisticsData={statisticsData} symbol={statisticsSymbol} />
+              )}
+
+              {/* Show Analysis */}
+              {analysisData && !chartData && !profileData && !statisticsData && !recommendationTrendData && !earningsCalendarData && (
+                <StockAnalysisCard analysisData={analysisData} symbol={analysisSymbol} />
+              )}
+
+              {/* Show Recommendation Trend */}
+              {recommendationTrendData && !chartData && !profileData && !statisticsData && !analysisData && !earningsCalendarData && (
+                <StockRecommendationTrendCard recommendationTrendData={recommendationTrendData} symbol={recommendationTrendSymbol} />
+              )}
+
+              {/* Show Earnings Calendar */}
+              {earningsCalendarData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && (
+                <StockEarningsCalendarCard earningsCalendarData={earningsCalendarData} dateRange={earningsCalendarDateRange} />
+              )}
+
+              {/* Show Trending Tickers */}
+              {trendingTickersData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && (
+                <TrendingTickersCard
+                  trendingTickersData={trendingTickersData}
+                  region={trendingTickersRegion}
+                  onTickerClick={async (symbol: string) => {
+                    setIsLoading(true);
+                    setShowComponents(false);
+
+                    const result = await fetchStockChart({ symbol, range: "1mo", interval: "1d" });
+
+                    if (result.success && result.chartData) {
+                      const newChartData = result.chartData;
+                      setChartData(newChartData);
+                      setMainStock(symbol);
+                      setSelectedStock(symbol);
+                      setComparisonStocks([]);
+                      setTrendingTickersData(null); // Clear trending tickers view
+
+                      // Add to history
+                      setContentHistory(prevHistory => {
+                        const newEntry: HistoryItem = {
+                          type: "chart",
+                          symbol: symbol,
+                          chartData: newChartData,
+                          mainStock: symbol,
+                          selectedStock: symbol,
+                          comparisonStocks: [],
+                          viewMode: currentChartView,
+                        };
+                        const updatedHistory = [...prevHistory, newEntry];
+                        setCurrentHistoryIndex(updatedHistory.length - 1);
+                        return updatedHistory;
+                      });
+
+                      setTimeout(() => setShowComponents(true), 100);
+                    } else {
+                      toast({
+                        title: "Error loading chart",
+                        description: result.error || "Failed to load chart data",
+                        variant: "destructive"
+                      });
+                    }
+
+                    setIsLoading(false);
+                  }}
+                />
+              )}
+
+              {/* Show loading or empty state */}
+              {!chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && (
+                <Card className="border-border">
+                  <CardContent className="p-6">
+                    {isLoading ? (
+                      <div className="flex flex-col items-center justify-center h-[300px]">
+                        <div className="w-10 h-10 border-4 border-muted border-t-primary rounded-full animate-spin mb-2"></div>
+                        <p className="text-muted-foreground text-sm">Loading data...</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-[300px] border border-dashed rounded-lg border-border bg-muted/30">
+                        <BarChart4 className="w-10 h-10 text-muted-foreground mb-2" />
+                        <p className="text-muted-foreground text-sm">Ask the assistant to show you stock data</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </div>
-            
-            {/* Stock Information Card */}
-            <div
-              className={`transition-all duration-700 ease-out delay-10 ${
-                showComponents && chartData 
-                  ? "opacity-100 " + 
-                    (slideDirection === 'left' 
-                      ? 'animate-slide-in-from-right' 
-                      : slideDirection === 'right' 
-                        ? 'animate-slide-in-from-left' 
-                        : 'translate-y-0')
-                  : "opacity-0 " + 
-                    (slideDirection === 'left' 
-                      ? 'translate-x-full' 
-                      : slideDirection === 'right' 
-                        ? '-translate-x-full' 
-                        : 'translate-y-8')
-              }`}
-            >
-              <Card className="border-white/20 dark:border-white/10 bg-white/5 dark:bg-black/5 backdrop-blur-xl relative overflow-hidden">
-                {/* Liquid Glass overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-white/10 dark:from-white/10 dark:via-transparent dark:to-white/5 pointer-events-none"></div>
-                <div className="absolute inset-0 bg-gradient-to-t from-transparent via-white/5 to-white/15 dark:from-transparent dark:via-white/2 dark:to-white/8 pointer-events-none"></div>
-                
-                <CardContent className="relative z-10 p-6">
-                  <h2 className="text-xl font-semibold mb-4">Stock Information</h2>
-                  {chartData && chartData.chart && chartData.chart.result && chartData.chart.result.length > 0 && selectedStock ? (
-                    <div className="grid grid-cols-1 gap-4">
-                      <StockInfoPanel stock={selectedStock} chartData={chartData} />
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-[260px] border border-dashed rounded-lg border-white/20 dark:border-white/10 bg-white/5 dark:bg-black/5 backdrop-blur-sm">
-                      <Info className="w-10 h-10 text-muted-foreground mb-2" />
-                      <p className="text-muted-foreground text-center text-sm">
-                        Select a stock or ask the assistant for details.
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+
+            {/* Stock Information Panel - Only show for charts */}
+            {chartData && (
+              <div
+                className={`transition-all duration-700 ease-out delay-100 ${
+                  showComponents && chartData
+                    ? "opacity-100 translate-y-0"
+                    : "opacity-0 translate-y-8"
+                }`}
+              >
+                <Card className="border-border">
+                  <CardContent className="p-6">
+                    <h2 className="text-lg font-semibold mb-4">Stock Information</h2>
+                    {chartData.chart && chartData.chart.result && chartData.chart.result.length > 0 && selectedStock ? (
+                      <div className="grid grid-cols-1 gap-4">
+                        <StockInfoPanel stock={selectedStock} chartData={chartData} />
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-[200px] border border-dashed rounded-lg border-border bg-muted/30">
+                        <Info className="w-10 h-10 text-muted-foreground mb-2" />
+                        <p className="text-muted-foreground text-center text-sm">
+                          Select a stock or ask the assistant for details.
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="border-t border-border py-3 px-6 bg-background">
+        <p className="text-xs text-center text-muted-foreground">
+          Built by <span className="font-medium text-foreground">Kabeer Thockchom</span>
+        </p>
+      </footer>
     </main>
   )
 }

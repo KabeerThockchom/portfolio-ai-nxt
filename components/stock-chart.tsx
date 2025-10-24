@@ -108,16 +108,19 @@ export default function StockChart({ chartData, symbol, viewMode = "price" }: St
     const subtitleText = `Current: $${metadata.regularMarketPrice?.toFixed(2)} | ${changeSign}$${change.toFixed(2)} (${changeSign}${changePercent.toFixed(2)}%)`
 
     const isDarkMode = theme === "dark"
-    const textColor = isDarkMode ? "#ffffff" : "#333333"
-    const gridColor = isDarkMode ? "#999999" : "#cccccc"
-    const backgroundColor = isDarkMode ? "#333333" : "#ffffff"
+    const textColor = isDarkMode ? "#FAFAFA" : "#0A0A0A"
+    const gridColor = isDarkMode ? "#262626" : "#E5E5E5"
+    const backgroundColor = isDarkMode ? "#0A0A0A" : "#FFFFFF"
+    const primaryColor = "#6366F1"
+    const successColor = "#10B981"
+    const dangerColor = "#EF4444"
 
     const options = {
       series,
       chart: {
         type: "area",
         height: 350,
-        fontFamily: "Segoe UI, sans-serif",
+        fontFamily: "Inter, sans-serif",
         foreColor: textColor,
         background: backgroundColor,
         toolbar: {
@@ -155,7 +158,7 @@ export default function StockChart({ chartData, symbol, viewMode = "price" }: St
       stroke: {
         curve: "smooth",
         width: 2,
-        colors: ["#ffe600", "#999999"],
+        colors: [primaryColor, "#737373"],
       },
       fill: {
         type: "gradient",
@@ -167,18 +170,18 @@ export default function StockChart({ chartData, symbol, viewMode = "price" }: St
           colorStops: [
             {
               offset: 0,
-              color: "#ffe600",
+              color: primaryColor,
               opacity: 0.4,
             },
             {
               offset: 100,
-              color: "#ffe600",
+              color: primaryColor,
               opacity: 0.1,
             },
           ],
         },
       },
-      colors: ["#ffe600", "#999999"],
+      colors: [primaryColor, "#737373"],
       grid: {
         borderColor: gridColor,
         row: {
@@ -193,7 +196,7 @@ export default function StockChart({ chartData, symbol, viewMode = "price" }: St
           datetimeUTC: false,
           style: {
             fontSize: "12px",
-            fontFamily: "Segoe UI, sans-serif",
+            fontFamily: "Inter, sans-serif",
             colors: textColor,
           },
         },
@@ -211,7 +214,7 @@ export default function StockChart({ chartData, symbol, viewMode = "price" }: St
           formatter: yaxisFormatter,
           style: {
             fontSize: "12px",
-            fontFamily: "Segoe UI, sans-serif",
+            fontFamily: "Inter, sans-serif",
             colors: textColor,
           },
         },
@@ -229,14 +232,14 @@ export default function StockChart({ chartData, symbol, viewMode = "price" }: St
         intersect: false,
         style: {
           fontSize: "12px",
-          fontFamily: "Segoe UI, sans-serif",
+          fontFamily: "Inter, sans-serif",
         },
       },
       legend: {
         position: "top",
         horizontalAlign: "right",
         fontSize: "14px",
-        fontFamily: "Segoe UI, sans-serif",
+        fontFamily: "Inter, sans-serif",
         offsetY: -15,
         labels: {
           colors: textColor,
@@ -252,7 +255,7 @@ export default function StockChart({ chartData, symbol, viewMode = "price" }: St
         align: "center",
         style: {
           fontSize: "18px",
-          fontFamily: "Segoe UI, sans-serif",
+          fontFamily: "Inter, sans-serif",
           fontWeight: 600,
           color: textColor,
         },
@@ -262,8 +265,8 @@ export default function StockChart({ chartData, symbol, viewMode = "price" }: St
         align: "center",
         style: {
           fontSize: "14px",
-          fontFamily: "Segoe UI, sans-serif",
-          color: "#ffe600",
+          fontFamily: "Inter, sans-serif",
+          color: change >= 0 ? successColor : dangerColor,
         },
       },
       markers: {
@@ -410,10 +413,10 @@ export default function StockChart({ chartData, symbol, viewMode = "price" }: St
       Object.values(result.events.dividends).forEach((dividend: any) => {
         annotations.xaxis.push({
           x: new Date(dividend.date * 1000).getTime(),
-          borderColor: "#ffe600",
+          borderColor: "#6366F1",
           label: {
-            borderColor: "#ffe600",
-            style: { color: "#333333", background: "#ffe600" },
+            borderColor: "#6366F1",
+            style: { color: "#FFFFFF", background: "#6366F1" },
             text: `Dividend: $${dividend.amount}`,
           },
         });
@@ -424,10 +427,10 @@ export default function StockChart({ chartData, symbol, viewMode = "price" }: St
       Object.values(result.events.splits).forEach((split: any) => {
         annotations.xaxis.push({
           x: new Date(split.date * 1000).getTime(),
-          borderColor: "#ffe600",
+          borderColor: "#6366F1",
           label: {
-            borderColor: "#ffe600",
-            style: { color: "#333333", background: "#ffe600" },
+            borderColor: "#6366F1",
+            style: { color: "#FFFFFF", background: "#6366F1" },
             text: `Split: ${split.numerator}:${split.denominator}`,
           },
         });
@@ -438,10 +441,10 @@ export default function StockChart({ chartData, symbol, viewMode = "price" }: St
       Object.values(result.events.earnings).forEach((earning: any) => {
         annotations.xaxis.push({
           x: new Date(earning.date * 1000).getTime(),
-          borderColor: "#ffe600",
+          borderColor: "#6366F1",
           label: {
-            borderColor: "#ffe600",
-            style: { color: "#333333", background: "#ffe600" },
+            borderColor: "#6366F1",
+            style: { color: "#FFFFFF", background: "#6366F1" },
             text: "Earnings",
           },
         });
