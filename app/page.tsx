@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Mic, MicOff, BarChart4, Info, ChevronLeft, ChevronRight, Sparkles, HelpCircle, TrendingUp } from "lucide-react"
+import { Mic, MicOff, BarChart4, Info, ChevronLeft, ChevronRight, Sparkles, HelpCircle, TrendingUp, Users } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import StockInfoPanel from "@/components/stock-info-panel"
 import StockProfileCard from "@/components/stock-profile-card"
@@ -13,6 +13,7 @@ import StockAnalysisCard from "@/components/stock-analysis-card"
 import StockRecommendationTrendCard from "@/components/stock-recommendation-trend-card"
 import StockEarningsCalendarCard from "@/components/stock-earnings-calendar-card"
 import TrendingTickersCard from "@/components/trending-tickers-card"
+import StockInsiderTransactionsCard from "@/components/stock-insider-transactions-card"
 import { useToast } from "@/hooks/use-toast"
 import StockChart from "@/components/stock-chart"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -67,7 +68,7 @@ type RtcHelpersModule = typeof import('@/lib/webrtc-helpers');
 
 // Interface for history items - supports chart, profile, and statistics
 interface HistoryItem {
-  type: "chart" | "profile" | "statistics" | "analysis" | "recommendation-trend" | "earnings-calendar" | "trending-tickers";
+  type: "chart" | "profile" | "statistics" | "analysis" | "recommendation-trend" | "earnings-calendar" | "trending-tickers" | "insider-transactions";
   symbol: string;
   // Chart-specific data
   chartData?: ChartData;
@@ -89,6 +90,8 @@ interface HistoryItem {
   // Trending Tickers-specific data
   trendingTickersData?: any;
   trendingTickersRegion?: string;
+  // Insider Transactions-specific data
+  insiderTransactionsData?: any;
 }
 
 const examplePrompts = [
@@ -100,6 +103,7 @@ const examplePrompts = [
   "What's the recommendation trend for Amazon?",
   "What are the trending stocks today?",
   "Show me upcoming earnings this week",
+  "Show me insider transactions for Apple",
   "Google's stock price over the past year",
 ];
 
@@ -132,11 +136,15 @@ export default function Home() {
   const [earningsCalendarDateRange, setEarningsCalendarDateRange] = useState<{ period1?: string; period2?: string }>({})
   const [trendingTickersData, setTrendingTickersData] = useState<any | null>(null)
   const [trendingTickersRegion, setTrendingTickersRegion] = useState<string>("")
+  const [insiderTransactionsData, setInsiderTransactionsData] = useState<any | null>(null)
+  const [insiderTransactionsSymbol, setInsiderTransactionsSymbol] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [rtcHelpers, setRtcHelpers] = useState<RtcHelpersModule | null>(null);
   const [showComponents, setShowComponents] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
+  const [showHelpGlow, setShowHelpGlow] = useState(false);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
   const dataChannelRef = useRef<RTCDataChannel | null>(null)
@@ -179,6 +187,36 @@ export default function Home() {
         });
       });
   }, [toast])
+
+  // Auto-open help dialog on first visit
+  useEffect(() => {
+    const hasSeenHelp = localStorage.getItem('portfolio-ai-help-seen');
+    if (!hasSeenHelp) {
+      // Small delay to let the UI render first
+      setTimeout(() => {
+        setIsHelpDialogOpen(true);
+      }, 1000);
+    } else {
+      // Show glow effect if they haven't clicked help in this session
+      const hasClickedHelpThisSession = sessionStorage.getItem('portfolio-ai-help-clicked');
+      if (!hasClickedHelpThisSession) {
+        setShowHelpGlow(true);
+      }
+    }
+  }, []);
+
+  // Handle help dialog close
+  const handleHelpDialogChange = (open: boolean) => {
+    setIsHelpDialogOpen(open);
+    if (open) {
+      // Mark as seen in localStorage (persists across sessions)
+      localStorage.setItem('portfolio-ai-help-seen', 'true');
+      // Mark as clicked in sessionStorage (for this session only)
+      sessionStorage.setItem('portfolio-ai-help-clicked', 'true');
+      // Hide the glow effect
+      setShowHelpGlow(false);
+    }
+  };
 
   const fetchApiKeys = async () => {
     try {
@@ -349,6 +387,22 @@ export default function Home() {
     } catch (error) {
       console.error("Error fetching trending tickers:", error)
       return { success: false, error: error instanceof Error ? error.message : "Unknown error fetching trending tickers" }
+    }
+  }, []);
+
+  const fetchInsiderTransactions = useCallback(async (args: any): Promise<ApiStockChartResponse | { success: false; error: string }> => {
+    try {
+      const { symbol, region, lang } = args
+      const params = new URLSearchParams()
+      params.append("symbol", symbol)
+      if (region) params.append("region", region)
+      if (lang) params.append("lang", lang)
+      const response = await fetch(`/api/stock/insider-transactions?${params.toString()}`)
+      if (!response.ok) throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching insider transactions:", error)
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error fetching insider transactions" }
     }
   }, []);
 
@@ -614,6 +668,42 @@ export default function Home() {
           setTrendingTickersData(null)
         }
         setIsLoading(false)
+      } else if (msg.name === "getInsiderTransactions") {
+        setIsLoading(true)
+        setShowComponents(false);
+        // Clear other content types
+        setChartData(null);
+        setProfileData(null);
+        setStatisticsData(null);
+        setAnalysisData(null);
+        setRecommendationTrendData(null);
+        setEarningsCalendarData(null);
+        setTrendingTickersData(null);
+
+        apiResponse = await fetchInsiderTransactions(args)
+        if (apiResponse && apiResponse.success && (apiResponse as any).insiderTransactionsData) {
+          const newInsiderTransactionsData = (apiResponse as any).insiderTransactionsData;
+          setInsiderTransactionsData(newInsiderTransactionsData)
+          setInsiderTransactionsSymbol(args.symbol)
+
+          // Add to history
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "insider-transactions",
+              symbol: args.symbol,
+              insiderTransactionsData: newInsiderTransactionsData,
+            };
+            const updatedHistory = [...prevHistory, newEntry];
+            setCurrentHistoryIndex(updatedHistory.length - 1);
+            return updatedHistory;
+          });
+
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150);
+        } else if (apiResponse && !apiResponse.success) {
+          toast({ title: "Error fetching insider transactions", description: apiResponse.error, variant: "destructive" });
+          setInsiderTransactionsData(null)
+        }
+        setIsLoading(false)
       } else if (msg.name === "muteAssistant") {
         // Allow the assistant to end the conversation
         stopAssistant();
@@ -654,7 +744,7 @@ export default function Home() {
          dataChannelRef.current.send(JSON.stringify({ type: "response.create" }))
       }
     }
-  }, [toast, fetchStockChart, fetchStockProfile, fetchStockStatistics, fetchStockAnalysis, fetchStockRecommendationTrend, fetchEarningsCalendar, fetchTrendingTickers, stopAssistant]);
+  }, [toast, fetchStockChart, fetchStockProfile, fetchStockStatistics, fetchStockAnalysis, fetchStockRecommendationTrend, fetchEarningsCalendar, fetchTrendingTickers, fetchInsiderTransactions, stopAssistant]);
 
   const configureDataChannel = useCallback((dataChannel: RTCDataChannel) => {
     const event = {
@@ -770,6 +860,20 @@ export default function Home() {
                 lang: { type: "string", description: "Language code (default: en-US)" },
               },
               required: [],
+            },
+          },
+          {
+            type: "function",
+            name: "getInsiderTransactions",
+            description: "Fetches insider transaction data for a given stock symbol, showing purchases, sales, and grants by company executives, directors, and major shareholders. Includes transaction dates, insider names/roles, number of shares, transaction values, and net buying/selling activity over the past 6 months. Use this to understand insider sentiment and confidence in the company.",
+            parameters: {
+              type: "object",
+              properties: {
+                symbol: { type: "string", description: "Stock symbol (e.g., AAPL, TSLA, MSFT)" },
+                region: { type: "string", description: "Region code (default: US)" },
+                lang: { type: "string", description: "Language code (default: en-US)" },
+              },
+              required: ["symbol"],
             },
           },
           {
@@ -981,6 +1085,7 @@ export default function Home() {
         setRecommendationTrendData(null);
         setEarningsCalendarData(null);
         setTrendingTickersData(null);
+        setInsiderTransactionsData(null);
 
         // Second timeout: Restore new states after clearing has rendered
         setTimeout(() => {
@@ -1009,6 +1114,9 @@ export default function Home() {
           } else if (historyItem.type === "trending-tickers") {
             setTrendingTickersData(historyItem.trendingTickersData);
             setTrendingTickersRegion(historyItem.trendingTickersRegion || "US");
+          } else if (historyItem.type === "insider-transactions") {
+            setInsiderTransactionsData(historyItem.insiderTransactionsData);
+            setInsiderTransactionsSymbol(historyItem.symbol);
           }
 
           setCurrentHistoryIndex(index);
@@ -1099,11 +1207,25 @@ export default function Home() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Dialog>
+          <Dialog open={isHelpDialogOpen} onOpenChange={handleHelpDialogChange}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="icon" aria-label="Help" style={{ borderColor: '#47befb' }}>
-                <HelpCircle className="h-[1.2rem] w-[1.2rem]" style={{ color: '#47befb' }} />
-              </Button>
+              <div className="relative">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="Help"
+                  style={{ borderColor: '#47befb' }}
+                  className={showHelpGlow ? 'help-button-glow' : ''}
+                >
+                  <HelpCircle className="h-[1.2rem] w-[1.2rem]" style={{ color: '#47befb' }} />
+                </Button>
+                {showHelpGlow && (
+                  <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs py-1.5 px-3 rounded-md whitespace-nowrap animate-bounce pointer-events-none">
+                    👋 New here? Click for help!
+                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-primary rotate-45"></div>
+                  </div>
+                )}
+              </div>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
@@ -1227,6 +1349,21 @@ export default function Home() {
                           </p>
                           <p className="text-xs text-primary mt-2 italic">
                             Example: "What stocks are trending today?"
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border border-border rounded-lg p-4 bg-muted/30">
+                      <div className="flex items-start gap-3">
+                        <Users className="h-5 w-5 mt-0.5 text-primary" />
+                        <div>
+                          <h4 className="font-semibold text-sm">Insider Transactions</h4>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Track insider buying and selling activity by company executives, directors, and major shareholders. View transaction types, shares traded, values, and net insider sentiment over the past 6 months.
+                          </p>
+                          <p className="text-xs text-primary mt-2 italic">
+                            Example: "Show me insider transactions for Apple"
                           </p>
                         </div>
                       </div>
@@ -1388,7 +1525,7 @@ export default function Home() {
             {/* Main Content Card - Shows Chart, Profile, Statistics, Analysis, or Trending Tickers */}
             <div
               className={`transition-all duration-700 ease-out ${
-                showComponents && (chartData || profileData || statisticsData || analysisData || recommendationTrendData || earningsCalendarData || trendingTickersData)
+                showComponents && (chartData || profileData || statisticsData || analysisData || recommendationTrendData || earningsCalendarData || trendingTickersData || insiderTransactionsData)
                   ? "opacity-100 " +
                     (slideDirection === 'left'
                       ? 'animate-slide-in-from-right'
@@ -1504,7 +1641,7 @@ export default function Home() {
               )}
 
               {/* Show Trending Tickers */}
-              {trendingTickersData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && (
+              {trendingTickersData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !insiderTransactionsData && (
                 <TrendingTickersCard
                   trendingTickersData={trendingTickersData}
                   region={trendingTickersRegion}
@@ -1552,8 +1689,13 @@ export default function Home() {
                 />
               )}
 
+              {/* Show Insider Transactions */}
+              {insiderTransactionsData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && (
+                <StockInsiderTransactionsCard insiderTransactionsData={insiderTransactionsData} symbol={insiderTransactionsSymbol} />
+              )}
+
               {/* Show loading or empty state */}
-              {!chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && (
+              {!chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && (
                 <Card className="border-border">
                   <CardContent className="p-6">
                     {isLoading ? (
