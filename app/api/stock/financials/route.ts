@@ -14,13 +14,9 @@ export async function GET(request: Request) {
     const params = new URLSearchParams()
     params.append("symbol", symbol)
     params.append("region", region)
+    params.append("lang", lang)
 
-    // Add modules parameter to request specific financial data
-    const modules = "incomeStatementHistory,incomeStatementHistoryQuarterly,balanceSheetHistory,balanceSheetHistoryQuarterly,cashflowStatementHistory,cashflowStatementHistoryQuarterly"
-    params.append("modules", modules)
-
-    // Use the stock/v2/get-financials endpoint with modules
-    const url = `https://yahoo-finance-real-time1.p.rapidapi.com/stock/v2/get-financials?${params.toString()}`
+    const url = `https://yahoo-finance-real-time1.p.rapidapi.com/stock/get-balance-sheet?${params.toString()}`
     const options = {
       method: "GET",
       headers: {
@@ -37,17 +33,9 @@ export async function GET(request: Request) {
 
     const result = await response.json()
 
-    // Log the structure to help debug
-    console.log("Financials API response structure:", JSON.stringify(Object.keys(result || {})))
-    console.log("Has quoteSummary:", !!result?.quoteSummary)
-
-    // Extract the financial data from quoteSummary response structure
-    const financialsData = result?.quoteSummary?.result?.[0] || result
-    console.log("Extracted financials data keys:", JSON.stringify(Object.keys(financialsData || {})))
-
     return NextResponse.json({
       success: true,
-      financialsData,
+      financialsData: result,
     })
   } catch (error: any) {
     console.error("Error fetching stock financials:", error)
