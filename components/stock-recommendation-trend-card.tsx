@@ -1,14 +1,18 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Award } from "lucide-react";
+import { ApiCallDetails } from "@/components/api-call-details";
+import { ApiCallMetadata } from "@/types";
 
 interface StockRecommendationTrendCardProps {
   recommendationTrendData: any;
   symbol: string;
+  apiCallDetails?: ApiCallMetadata;
 }
 
 export default function StockRecommendationTrendCard({
   recommendationTrendData,
-  symbol
+  symbol,
+  apiCallDetails
 }: StockRecommendationTrendCardProps) {
   if (!recommendationTrendData || !recommendationTrendData.recommendationTrend) {
     return (
@@ -87,6 +91,7 @@ export default function StockRecommendationTrendCard({
               Analyst Recommendation Trend
             </p>
           </div>
+          <ApiCallDetails apiCallDetails={apiCallDetails} />
         </div>
       </CardHeader>
 

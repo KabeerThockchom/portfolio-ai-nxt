@@ -1,13 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Users, Globe, MapPin } from "lucide-react";
+import { ApiCallDetails } from "@/components/api-call-details";
+import { ApiCallMetadata } from "@/types";
 
 interface StockProfileCardProps {
   profileData: any;
   symbol: string;
+  apiCallDetails?: ApiCallMetadata;
 }
 
-export default function StockProfileCard({ profileData, symbol }: StockProfileCardProps) {
+export default function StockProfileCard({ profileData, symbol, apiCallDetails }: StockProfileCardProps) {
   if (!profileData || !profileData.summaryProfile) {
     return (
       <Card className="border-border">
@@ -42,6 +45,7 @@ export default function StockProfileCard({ profileData, symbol }: StockProfileCa
             <CardTitle className="text-lg font-semibold">{companyName}</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">Company Profile</p>
           </div>
+          <ApiCallDetails apiCallDetails={apiCallDetails} />
         </div>
       </CardHeader>
 

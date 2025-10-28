@@ -1,15 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, TrendingUp, TrendingDown, Award, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { useState } from "react";
+import { ApiCallDetails } from "@/components/api-call-details";
+import { ApiCallMetadata } from "@/types";
 
 interface StockInsiderTransactionsCardProps {
   insiderTransactionsData: any;
   symbol: string;
+  apiCallDetails?: ApiCallMetadata;
 }
 
 export default function StockInsiderTransactionsCard({
   insiderTransactionsData,
-  symbol
+  symbol,
+  apiCallDetails
 }: StockInsiderTransactionsCardProps) {
   const [filterType, setFilterType] = useState<"all" | "purchase" | "sale" | "grant">("all");
 
@@ -55,6 +59,7 @@ export default function StockInsiderTransactionsCard({
             <CardTitle className="text-lg font-semibold">{companyName}</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">Insider Transactions</p>
           </div>
+          <ApiCallDetails apiCallDetails={apiCallDetails} />
         </div>
       </CardHeader>
 

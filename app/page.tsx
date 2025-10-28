@@ -17,13 +17,14 @@ import StockInsiderTransactionsCard from "@/components/stock-insider-transaction
 import StockBalanceSheetCard from "@/components/stock-balance-sheet-card"
 import StockIncomeStatementCard from "@/components/stock-income-statement-card"
 import StockCashFlowCard from "@/components/stock-cash-flow-card"
-import ToolCallsPanel from "@/components/tool-calls-panel"
+import { ApiCallDetails } from "@/components/api-call-details"
 import { useToast } from "@/hooks/use-toast"
 import StockChart from "@/components/stock-chart"
 import { ThemeToggle } from "@/components/theme-toggle"
 import TypewriterBadges from "@/components/ui/typewriter-badges"
 import AudioSphereVisualizer from "@/components/ui/audio-sphere-visualizer"
 import ReactMarkdown from "react-markdown"
+import { ApiCallMetadata } from "@/types"
 
 // Define types for chartData
 interface ChartMeta {
@@ -70,20 +71,12 @@ interface ApiStockChartResponse {
 // Define the type for the dynamically imported module
 type RtcHelpersModule = typeof import('@/lib/webrtc-helpers');
 
-// Interface for function calls tracking
-interface FunctionCall {
-  id: string;
-  name: string;
-  parameters: Record<string, any>;
-  timestamp: number;
-  status: 'success' | 'error';
-  result?: any;
-}
-
 // Interface for history items - supports chart, profile, and statistics
 interface HistoryItem {
   type: "chart" | "profile" | "statistics" | "analysis" | "recommendation-trend" | "earnings-calendar" | "trending-tickers" | "insider-transactions" | "balance-sheet" | "income-statement" | "cash-flow";
   symbol: string;
+  // API call metadata
+  apiCallDetails?: ApiCallMetadata;
   // Chart-specific data
   chartData?: ChartData;
   mainStock?: string;
@@ -164,6 +157,20 @@ export default function Home() {
   const [incomeStatementSymbol, setIncomeStatementSymbol] = useState<string>("")
   const [cashFlowDataState, setCashFlowDataState] = useState<any | null>(null)
   const [cashFlowSymbol, setCashFlowSymbol] = useState<string>("")
+
+  // API metadata state
+  const [chartApiDetails, setChartApiDetails] = useState<ApiCallMetadata | undefined>(undefined)
+  const [profileApiDetails, setProfileApiDetails] = useState<ApiCallMetadata | undefined>(undefined)
+  const [statisticsApiDetails, setStatisticsApiDetails] = useState<ApiCallMetadata | undefined>(undefined)
+  const [analysisApiDetails, setAnalysisApiDetails] = useState<ApiCallMetadata | undefined>(undefined)
+  const [recommendationTrendApiDetails, setRecommendationTrendApiDetails] = useState<ApiCallMetadata | undefined>(undefined)
+  const [earningsCalendarApiDetails, setEarningsCalendarApiDetails] = useState<ApiCallMetadata | undefined>(undefined)
+  const [trendingTickersApiDetails, setTrendingTickersApiDetails] = useState<ApiCallMetadata | undefined>(undefined)
+  const [insiderTransactionsApiDetails, setInsiderTransactionsApiDetails] = useState<ApiCallMetadata | undefined>(undefined)
+  const [balanceSheetApiDetails, setBalanceSheetApiDetails] = useState<ApiCallMetadata | undefined>(undefined)
+  const [incomeStatementApiDetails, setIncomeStatementApiDetails] = useState<ApiCallMetadata | undefined>(undefined)
+  const [cashFlowApiDetails, setCashFlowApiDetails] = useState<ApiCallMetadata | undefined>(undefined)
+
   const [isLoading, setIsLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [rtcHelpers, setRtcHelpers] = useState<RtcHelpersModule | null>(null);
@@ -171,9 +178,6 @@ export default function Home() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
   const [showHelpGlow, setShowHelpGlow] = useState(false);
-
-  // State for tracking function calls
-  const [functionCallHistory, setFunctionCallHistory] = useState<FunctionCall[]>([]);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
   const dataChannelRef = useRef<RTCDataChannel | null>(null)
@@ -243,7 +247,7 @@ export default function Home() {
 
   // Auto-scroll transcript to bottom when new messages arrive
   useEffect(() => {
-    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
   }, [conversationMessages, currentLlmMessage]);
 
   // Handle help dialog close
@@ -485,17 +489,6 @@ export default function Home() {
       const args = JSON.parse(msg.arguments)
       let apiResponse: ApiStockChartResponse | { success: false, error: string } | undefined;
 
-      // Log the function call
-      const callId = `${msg.name}-${Date.now()}`;
-      const functionCall: FunctionCall = {
-        id: callId,
-        name: msg.name,
-        parameters: args,
-        timestamp: Date.now(),
-        status: 'success', // Will update if error occurs
-      };
-      setFunctionCallHistory(prev => [...prev, functionCall]);
-
       if (msg.name === "getStockChart") {
         setIsLoading(true)
         setShowComponents(false);
@@ -503,13 +496,25 @@ export default function Home() {
         setProfileData(null);
         setStatisticsData(null);
 
+        const startTime = Date.now();
         apiResponse = await fetchStockChart(args)
+        const duration = Date.now() - startTime;
+
         if (apiResponse.success && apiResponse.chartData) {
           const newChartData = apiResponse.chartData;
           const newMainStock = args.symbol;
           const newSelectedStock = args.symbol;
           const newComparisonStocks = args.comparisons ? args.comparisons.split(",").map((s: string) => s.trim()) : [];
-          // Assuming currentChartView is already updated or use a default/arg
+
+          const apiMetadata: ApiCallMetadata = {
+            endpoint: '/api/stock/chart',
+            method: 'GET',
+            parameters: args,
+            timestamp: startTime,
+            duration: duration,
+            region: args.region
+          };
+          setChartApiDetails(apiMetadata);
 
           setChartData(newChartData);
           setMainStock(newMainStock);
@@ -526,6 +531,7 @@ export default function Home() {
               selectedStock: newSelectedStock,
               comparisonStocks: newComparisonStocks,
               viewMode: currentChartView,
+              apiCallDetails: apiMetadata,
             };
             const updatedHistory = [...prevHistory, newEntry];
             setCurrentHistoryIndex(updatedHistory.length - 1);
@@ -545,9 +551,23 @@ export default function Home() {
         setChartData(null);
         setStatisticsData(null);
 
+        const startTime = Date.now();
         apiResponse = await fetchStockProfile(args)
+        const duration = Date.now() - startTime;
+
         if (apiResponse && apiResponse.success && (apiResponse as any).profileData) {
           const newProfileData = (apiResponse as any).profileData;
+
+          const apiMetadata: ApiCallMetadata = {
+            endpoint: '/api/stock/profile',
+            method: 'GET',
+            parameters: args,
+            timestamp: startTime,
+            duration: duration,
+            region: args.region
+          };
+          setProfileApiDetails(apiMetadata);
+
           setProfileData(newProfileData)
           setProfileSymbol(args.symbol)
 
@@ -557,6 +577,7 @@ export default function Home() {
               type: "profile",
               symbol: args.symbol,
               profileData: newProfileData,
+              apiCallDetails: apiMetadata,
             };
             const updatedHistory = [...prevHistory, newEntry];
             setCurrentHistoryIndex(updatedHistory.length - 1);
@@ -576,9 +597,23 @@ export default function Home() {
         setChartData(null);
         setProfileData(null);
 
+        const startTime = Date.now();
         apiResponse = await fetchStockStatistics(args)
+        const duration = Date.now() - startTime;
+
         if (apiResponse && apiResponse.success && (apiResponse as any).statisticsData) {
           const newStatisticsData = (apiResponse as any).statisticsData;
+
+          const apiMetadata: ApiCallMetadata = {
+            endpoint: '/api/stock/statistics',
+            method: 'GET',
+            parameters: args,
+            timestamp: startTime,
+            duration: duration,
+            region: args.region
+          };
+          setStatisticsApiDetails(apiMetadata);
+
           setStatisticsData(newStatisticsData)
           setStatisticsSymbol(args.symbol)
 
@@ -588,6 +623,7 @@ export default function Home() {
               type: "statistics",
               symbol: args.symbol,
               statisticsData: newStatisticsData,
+              apiCallDetails: apiMetadata,
             };
             const updatedHistory = [...prevHistory, newEntry];
             setCurrentHistoryIndex(updatedHistory.length - 1);
@@ -608,9 +644,23 @@ export default function Home() {
         setProfileData(null);
         setStatisticsData(null);
 
+        const startTime = Date.now();
         apiResponse = await fetchStockAnalysis(args)
+        const duration = Date.now() - startTime;
+
         if (apiResponse && apiResponse.success && (apiResponse as any).analysisData) {
           const newAnalysisData = (apiResponse as any).analysisData;
+
+          const apiMetadata: ApiCallMetadata = {
+            endpoint: '/api/stock/analysis',
+            method: 'GET',
+            parameters: args,
+            timestamp: startTime,
+            duration: duration,
+            region: args.region
+          };
+          setAnalysisApiDetails(apiMetadata);
+
           setAnalysisData(newAnalysisData)
           setAnalysisSymbol(args.symbol)
 
@@ -620,6 +670,7 @@ export default function Home() {
               type: "analysis",
               symbol: args.symbol,
               analysisData: newAnalysisData,
+              apiCallDetails: apiMetadata,
             };
             const updatedHistory = [...prevHistory, newEntry];
             setCurrentHistoryIndex(updatedHistory.length - 1);
@@ -641,9 +692,23 @@ export default function Home() {
         setStatisticsData(null);
         setAnalysisData(null);
 
+        const startTime = Date.now();
         apiResponse = await fetchStockRecommendationTrend(args)
+        const duration = Date.now() - startTime;
+
         if (apiResponse && apiResponse.success && (apiResponse as any).recommendationTrendData) {
           const newRecommendationTrendData = (apiResponse as any).recommendationTrendData;
+
+          const apiMetadata: ApiCallMetadata = {
+            endpoint: '/api/stock/recommendation-trend',
+            method: 'GET',
+            parameters: args,
+            timestamp: startTime,
+            duration: duration,
+            region: args.region
+          };
+          setRecommendationTrendApiDetails(apiMetadata);
+
           setRecommendationTrendData(newRecommendationTrendData)
           setRecommendationTrendSymbol(args.symbol)
 
@@ -653,6 +718,7 @@ export default function Home() {
               type: "recommendation-trend",
               symbol: args.symbol,
               recommendationTrendData: newRecommendationTrendData,
+              apiCallDetails: apiMetadata,
             };
             const updatedHistory = [...prevHistory, newEntry];
             setCurrentHistoryIndex(updatedHistory.length - 1);
@@ -675,9 +741,23 @@ export default function Home() {
         setAnalysisData(null);
         setRecommendationTrendData(null);
 
+        const startTime = Date.now();
         apiResponse = await fetchEarningsCalendar(args)
+        const duration = Date.now() - startTime;
+
         if (apiResponse && apiResponse.success && (apiResponse as any).earningsCalendarData) {
           const newEarningsCalendarData = (apiResponse as any).earningsCalendarData;
+
+          const apiMetadata: ApiCallMetadata = {
+            endpoint: '/api/stock/earnings-calendar',
+            method: 'GET',
+            parameters: args,
+            timestamp: startTime,
+            duration: duration,
+            region: args.region
+          };
+          setEarningsCalendarApiDetails(apiMetadata);
+
           setEarningsCalendarData(newEarningsCalendarData)
           setEarningsCalendarDateRange({ period1: args.period1, period2: args.period2 })
 
@@ -688,6 +768,7 @@ export default function Home() {
               symbol: "", // Calendar doesn't have a single symbol
               earningsCalendarData: newEarningsCalendarData,
               earningsCalendarDateRange: { period1: args.period1, period2: args.period2 },
+              apiCallDetails: apiMetadata,
             };
             const updatedHistory = [...prevHistory, newEntry];
             setCurrentHistoryIndex(updatedHistory.length - 1);
@@ -711,9 +792,23 @@ export default function Home() {
         setRecommendationTrendData(null);
         setEarningsCalendarData(null);
 
+        const startTime = Date.now();
         apiResponse = await fetchTrendingTickers(args)
+        const duration = Date.now() - startTime;
+
         if (apiResponse && apiResponse.success && (apiResponse as any).trendingTickersData) {
           const newTrendingTickersData = (apiResponse as any).trendingTickersData;
+
+          const apiMetadata: ApiCallMetadata = {
+            endpoint: '/api/market/trending-tickers',
+            method: 'GET',
+            parameters: args,
+            timestamp: startTime,
+            duration: duration,
+            region: args.region || "US"
+          };
+          setTrendingTickersApiDetails(apiMetadata);
+
           setTrendingTickersData(newTrendingTickersData)
           setTrendingTickersRegion(args.region || "US")
 
@@ -724,6 +819,7 @@ export default function Home() {
               symbol: "", // Trending tickers doesn't have a single symbol
               trendingTickersData: newTrendingTickersData,
               trendingTickersRegion: args.region || "US",
+              apiCallDetails: apiMetadata,
             };
             const updatedHistory = [...prevHistory, newEntry];
             setCurrentHistoryIndex(updatedHistory.length - 1);
@@ -748,9 +844,23 @@ export default function Home() {
         setEarningsCalendarData(null);
         setTrendingTickersData(null);
 
+        const startTime = Date.now();
         apiResponse = await fetchInsiderTransactions(args)
+        const duration = Date.now() - startTime;
+
         if (apiResponse && apiResponse.success && (apiResponse as any).insiderTransactionsData) {
           const newInsiderTransactionsData = (apiResponse as any).insiderTransactionsData;
+
+          const apiMetadata: ApiCallMetadata = {
+            endpoint: '/api/stock/insider-transactions',
+            method: 'GET',
+            parameters: args,
+            timestamp: startTime,
+            duration: duration,
+            region: args.region
+          };
+          setInsiderTransactionsApiDetails(apiMetadata);
+
           setInsiderTransactionsData(newInsiderTransactionsData)
           setInsiderTransactionsSymbol(args.symbol)
 
@@ -760,6 +870,7 @@ export default function Home() {
               type: "insider-transactions",
               symbol: args.symbol,
               insiderTransactionsData: newInsiderTransactionsData,
+              apiCallDetails: apiMetadata,
             };
             const updatedHistory = [...prevHistory, newEntry];
             setCurrentHistoryIndex(updatedHistory.length - 1);
@@ -787,9 +898,23 @@ export default function Home() {
         setIncomeStatementDataState(null);
         setCashFlowDataState(null);
 
+        const startTime = Date.now();
         apiResponse = await fetchFinancials(args)
+        const duration = Date.now() - startTime;
+
         if (apiResponse && apiResponse.success && (apiResponse as any).financialsData) {
           const newFinancialsData = (apiResponse as any).financialsData;
+
+          const apiMetadata: ApiCallMetadata = {
+            endpoint: '/api/stock/financials',
+            method: 'GET',
+            parameters: args,
+            timestamp: startTime,
+            duration: duration,
+            region: args.region
+          };
+          setBalanceSheetApiDetails(apiMetadata);
+
           setBalanceSheetData(newFinancialsData)
           setBalanceSheetSymbol(args.symbol)
 
@@ -799,6 +924,7 @@ export default function Home() {
               type: "balance-sheet",
               symbol: args.symbol,
               balanceSheetData: newFinancialsData,
+              apiCallDetails: apiMetadata,
             };
             const updatedHistory = [...prevHistory, newEntry];
             setCurrentHistoryIndex(updatedHistory.length - 1);
@@ -826,9 +952,23 @@ export default function Home() {
         setBalanceSheetData(null);
         setCashFlowDataState(null);
 
+        const startTime = Date.now();
         apiResponse = await fetchFinancials(args)
+        const duration = Date.now() - startTime;
+
         if (apiResponse && apiResponse.success && (apiResponse as any).financialsData) {
           const newFinancialsData = (apiResponse as any).financialsData;
+
+          const apiMetadata: ApiCallMetadata = {
+            endpoint: '/api/stock/financials',
+            method: 'GET',
+            parameters: args,
+            timestamp: startTime,
+            duration: duration,
+            region: args.region
+          };
+          setIncomeStatementApiDetails(apiMetadata);
+
           setIncomeStatementDataState(newFinancialsData)
           setIncomeStatementSymbol(args.symbol)
 
@@ -838,6 +978,7 @@ export default function Home() {
               type: "income-statement",
               symbol: args.symbol,
               incomeStatementData: newFinancialsData,
+              apiCallDetails: apiMetadata,
             };
             const updatedHistory = [...prevHistory, newEntry];
             setCurrentHistoryIndex(updatedHistory.length - 1);
@@ -865,9 +1006,23 @@ export default function Home() {
         setBalanceSheetData(null);
         setIncomeStatementDataState(null);
 
+        const startTime = Date.now();
         apiResponse = await fetchFinancials(args)
+        const duration = Date.now() - startTime;
+
         if (apiResponse && apiResponse.success && (apiResponse as any).financialsData) {
           const newFinancialsData = (apiResponse as any).financialsData;
+
+          const apiMetadata: ApiCallMetadata = {
+            endpoint: '/api/stock/financials',
+            method: 'GET',
+            parameters: args,
+            timestamp: startTime,
+            duration: duration,
+            region: args.region
+          };
+          setCashFlowApiDetails(apiMetadata);
+
           setCashFlowDataState(newFinancialsData)
           setCashFlowSymbol(args.symbol)
 
@@ -877,6 +1032,7 @@ export default function Home() {
               type: "cash-flow",
               symbol: args.symbol,
               cashFlowData: newFinancialsData,
+              apiCallDetails: apiMetadata,
             };
             const updatedHistory = [...prevHistory, newEntry];
             setCurrentHistoryIndex(updatedHistory.length - 1);
@@ -916,17 +1072,6 @@ export default function Home() {
     } catch (error) {
       console.error("Error handling function call:", error)
       const errorMessage = error instanceof Error ? error.message : "Unknown error in function call";
-
-      // Update the function call as error
-      setFunctionCallHistory(prev => {
-        const updated = [...prev];
-        const lastCall = updated[updated.length - 1];
-        if (lastCall) {
-          lastCall.status = 'error';
-          lastCall.result = errorMessage;
-        }
-        return updated;
-      });
 
       const event = {
         type: "conversation.item.create",
@@ -1150,7 +1295,6 @@ export default function Home() {
 
     // Clear previous session history when starting a new session
     await clearConversationHistory();
-    setFunctionCallHistory([]); // Clear function call history
     setConversationMessages([]); // Clear conversation messages
     setCurrentLlmMessage(""); // Clear current message
 
@@ -1353,36 +1497,47 @@ export default function Home() {
             setSelectedStock(historyItem.selectedStock || "");
             setComparisonStocks(historyItem.comparisonStocks || []);
             setCurrentChartView(historyItem.viewMode || "price");
+            setChartApiDetails(historyItem.apiCallDetails);
           } else if (historyItem.type === "profile") {
             setProfileData(historyItem.profileData);
             setProfileSymbol(historyItem.symbol);
+            setProfileApiDetails(historyItem.apiCallDetails);
           } else if (historyItem.type === "statistics") {
             setStatisticsData(historyItem.statisticsData);
             setStatisticsSymbol(historyItem.symbol);
+            setStatisticsApiDetails(historyItem.apiCallDetails);
           } else if (historyItem.type === "analysis") {
             setAnalysisData(historyItem.analysisData);
             setAnalysisSymbol(historyItem.symbol);
+            setAnalysisApiDetails(historyItem.apiCallDetails);
           } else if (historyItem.type === "recommendation-trend") {
             setRecommendationTrendData(historyItem.recommendationTrendData);
             setRecommendationTrendSymbol(historyItem.symbol);
+            setRecommendationTrendApiDetails(historyItem.apiCallDetails);
           } else if (historyItem.type === "earnings-calendar") {
             setEarningsCalendarData(historyItem.earningsCalendarData);
             setEarningsCalendarDateRange(historyItem.earningsCalendarDateRange || {});
+            setEarningsCalendarApiDetails(historyItem.apiCallDetails);
           } else if (historyItem.type === "trending-tickers") {
             setTrendingTickersData(historyItem.trendingTickersData);
             setTrendingTickersRegion(historyItem.trendingTickersRegion || "US");
+            setTrendingTickersApiDetails(historyItem.apiCallDetails);
           } else if (historyItem.type === "insider-transactions") {
             setInsiderTransactionsData(historyItem.insiderTransactionsData);
             setInsiderTransactionsSymbol(historyItem.symbol);
+            setInsiderTransactionsApiDetails(historyItem.apiCallDetails);
           } else if (historyItem.type === "balance-sheet") {
             setBalanceSheetData(historyItem.balanceSheetData);
             setBalanceSheetSymbol(historyItem.symbol);
+            setBalanceSheetApiDetails(historyItem.apiCallDetails);
           } else if (historyItem.type === "income-statement") {
             setIncomeStatementDataState(historyItem.incomeStatementData);
             setIncomeStatementSymbol(historyItem.symbol);
+            setIncomeStatementApiDetails(historyItem.apiCallDetails);
           } else if (historyItem.type === "cash-flow") {
             setCashFlowDataState(historyItem.cashFlowData);
             setCashFlowSymbol(historyItem.symbol);
+            setCashFlowApiDetails(historyItem.apiCallDetails);
           }
 
           setCurrentHistoryIndex(index);
@@ -1805,19 +1960,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* Tool Calls Panel - Always show at top if there are function calls */}
-            {functionCallHistory.length > 0 && (
-              <div
-                className={`transition-all duration-500 ease-out ${
-                  showComponents
-                    ? "opacity-100 translate-y-0"
-                    : "opacity-0 -translate-y-4"
-                }`}
-              >
-                <ToolCallsPanel functionCalls={functionCallHistory} />
-              </div>
-            )}
-
             {/* Main Content Card - Shows Chart, Profile, Statistics, Analysis, Trending Tickers, or Financial Statements */}
             <div
               className={`transition-all duration-700 ease-out ${
@@ -1841,7 +1983,10 @@ export default function Home() {
               <Card className="border-border">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold">Stock Chart</h2>
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-lg font-semibold">Stock Chart</h2>
+                      <ApiCallDetails apiCallDetails={chartApiDetails} />
+                    </div>
                     <select
                       id="chartView"
                       className="px-3 py-1.5 text-sm rounded-md border border-border bg-background text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none"
@@ -1913,27 +2058,27 @@ export default function Home() {
 
               {/* Show Profile */}
               {profileData && !chartData && (
-                <StockProfileCard profileData={profileData} symbol={profileSymbol} />
+                <StockProfileCard profileData={profileData} symbol={profileSymbol} apiCallDetails={profileApiDetails} />
               )}
 
               {/* Show Statistics */}
               {statisticsData && !chartData && !profileData && !analysisData && !recommendationTrendData && !earningsCalendarData && (
-                <StockStatisticsCard statisticsData={statisticsData} symbol={statisticsSymbol} />
+                <StockStatisticsCard statisticsData={statisticsData} symbol={statisticsSymbol} apiCallDetails={statisticsApiDetails} />
               )}
 
               {/* Show Analysis */}
               {analysisData && !chartData && !profileData && !statisticsData && !recommendationTrendData && !earningsCalendarData && (
-                <StockAnalysisCard analysisData={analysisData} symbol={analysisSymbol} />
+                <StockAnalysisCard analysisData={analysisData} symbol={analysisSymbol} apiCallDetails={analysisApiDetails} />
               )}
 
               {/* Show Recommendation Trend */}
               {recommendationTrendData && !chartData && !profileData && !statisticsData && !analysisData && !earningsCalendarData && (
-                <StockRecommendationTrendCard recommendationTrendData={recommendationTrendData} symbol={recommendationTrendSymbol} />
+                <StockRecommendationTrendCard recommendationTrendData={recommendationTrendData} symbol={recommendationTrendSymbol} apiCallDetails={recommendationTrendApiDetails} />
               )}
 
               {/* Show Earnings Calendar */}
               {earningsCalendarData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && (
-                <StockEarningsCalendarCard earningsCalendarData={earningsCalendarData} dateRange={earningsCalendarDateRange} />
+                <StockEarningsCalendarCard earningsCalendarData={earningsCalendarData} dateRange={earningsCalendarDateRange} apiCallDetails={earningsCalendarApiDetails} />
               )}
 
               {/* Show Trending Tickers */}
@@ -1941,6 +2086,7 @@ export default function Home() {
                 <TrendingTickersCard
                   trendingTickersData={trendingTickersData}
                   region={trendingTickersRegion}
+                  apiCallDetails={trendingTickersApiDetails}
                   onTickerClick={async (symbol: string) => {
                     setIsLoading(true);
                     setShowComponents(false);
@@ -1987,22 +2133,22 @@ export default function Home() {
 
               {/* Show Insider Transactions */}
               {insiderTransactionsData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && (
-                <StockInsiderTransactionsCard insiderTransactionsData={insiderTransactionsData} symbol={insiderTransactionsSymbol} />
+                <StockInsiderTransactionsCard insiderTransactionsData={insiderTransactionsData} symbol={insiderTransactionsSymbol} apiCallDetails={insiderTransactionsApiDetails} />
               )}
 
               {/* Show Balance Sheet */}
               {balanceSheetData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !incomeStatementDataState && !cashFlowDataState && (
-                <StockBalanceSheetCard financialsData={balanceSheetData} symbol={balanceSheetSymbol} />
+                <StockBalanceSheetCard financialsData={balanceSheetData} symbol={balanceSheetSymbol} apiCallDetails={balanceSheetApiDetails} />
               )}
 
               {/* Show Income Statement */}
               {incomeStatementDataState && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !cashFlowDataState && (
-                <StockIncomeStatementCard financialsData={incomeStatementDataState} symbol={incomeStatementSymbol} />
+                <StockIncomeStatementCard financialsData={incomeStatementDataState} symbol={incomeStatementSymbol} apiCallDetails={incomeStatementApiDetails} />
               )}
 
               {/* Show Cash Flow */}
               {cashFlowDataState && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && (
-                <StockCashFlowCard financialsData={cashFlowDataState} symbol={cashFlowSymbol} />
+                <StockCashFlowCard financialsData={cashFlowDataState} symbol={cashFlowSymbol} apiCallDetails={cashFlowApiDetails} />
               )}
 
               {/* Show loading or empty state */}

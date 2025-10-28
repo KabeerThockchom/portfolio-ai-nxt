@@ -4,15 +4,18 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DollarSign, Calendar, TrendingUp, TrendingDown } from "lucide-react"
 import dynamic from "next/dynamic"
+import { ApiCallDetails } from "@/components/api-call-details"
+import { ApiCallMetadata } from "@/types"
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false })
 
 interface StockIncomeStatementCardProps {
   financialsData: any
   symbol: string
+  apiCallDetails?: ApiCallMetadata
 }
 
-export default function StockIncomeStatementCard({ financialsData, symbol }: StockIncomeStatementCardProps) {
+export default function StockIncomeStatementCard({ financialsData, symbol, apiCallDetails }: StockIncomeStatementCardProps) {
   const [period, setPeriod] = useState<"annual" | "quarterly">("annual")
 
   if (!financialsData) {
@@ -147,15 +150,18 @@ export default function StockIncomeStatementCard({ financialsData, symbol }: Sto
               Revenue, Expenses, and Profitability
             </p>
           </div>
-          <select
-            id="incomeStatementPeriod"
-            className="px-3 py-1.5 text-sm rounded-md border border-border bg-background text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none"
-            value={period}
-            onChange={(e) => setPeriod(e.target.value as "annual" | "quarterly")}
-          >
-            <option value="annual">Annual</option>
-            <option value="quarterly">Quarterly</option>
-          </select>
+          <div className="flex items-center gap-2">
+            <ApiCallDetails apiCallDetails={apiCallDetails} />
+            <select
+              id="incomeStatementPeriod"
+              className="px-3 py-1.5 text-sm rounded-md border border-border bg-background text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none"
+              value={period}
+              onChange={(e) => setPeriod(e.target.value as "annual" | "quarterly")}
+            >
+              <option value="annual">Annual</option>
+              <option value="quarterly">Quarterly</option>
+            </select>
+          </div>
         </div>
       </CardHeader>
 

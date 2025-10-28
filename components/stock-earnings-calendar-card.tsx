@@ -1,14 +1,18 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, TrendingUp, TrendingDown, Clock } from "lucide-react";
+import { ApiCallDetails } from "@/components/api-call-details";
+import { ApiCallMetadata } from "@/types";
 
 interface StockEarningsCalendarCardProps {
   earningsCalendarData: any;
   dateRange?: { period1?: string; period2?: string };
+  apiCallDetails?: ApiCallMetadata;
 }
 
 export default function StockEarningsCalendarCard({
   earningsCalendarData,
-  dateRange
+  dateRange,
+  apiCallDetails
 }: StockEarningsCalendarCardProps) {
   if (!earningsCalendarData || !earningsCalendarData.finance || !earningsCalendarData.finance.result) {
     return (
@@ -90,6 +94,7 @@ export default function StockEarningsCalendarCard({
               }
             </p>
           </div>
+          <ApiCallDetails apiCallDetails={apiCallDetails} />
         </div>
       </CardHeader>
 

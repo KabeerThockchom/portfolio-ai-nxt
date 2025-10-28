@@ -1,16 +1,20 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Flame } from "lucide-react";
+import { ApiCallDetails } from "@/components/api-call-details";
+import { ApiCallMetadata } from "@/types";
 
 interface TrendingTickersCardProps {
   trendingTickersData: any;
   region: string;
   onTickerClick?: (symbol: string) => void;
+  apiCallDetails?: ApiCallMetadata;
 }
 
 export default function TrendingTickersCard({
   trendingTickersData,
   region,
-  onTickerClick
+  onTickerClick,
+  apiCallDetails
 }: TrendingTickersCardProps) {
   if (!trendingTickersData || !trendingTickersData.finance || !trendingTickersData.finance.result) {
     return (
@@ -49,7 +53,10 @@ export default function TrendingTickersCard({
               {region} • {tickers.length} {tickers.length === 1 ? 'stock' : 'stocks'}
             </p>
           </div>
-          <Flame className="h-5 w-5 text-orange-500" />
+          <div className="flex items-center gap-2">
+            <Flame className="h-5 w-5 text-orange-500" />
+            <ApiCallDetails apiCallDetails={apiCallDetails} />
+          </div>
         </div>
       </CardHeader>
 

@@ -1,12 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, DollarSign, Target, Calendar, Award } from "lucide-react";
+import { ApiCallDetails } from "@/components/api-call-details";
+import { ApiCallMetadata } from "@/types";
 
 interface StockAnalysisCardProps {
   analysisData: any;
   symbol: string;
+  apiCallDetails?: ApiCallMetadata;
 }
 
-export default function StockAnalysisCard({ analysisData, symbol }: StockAnalysisCardProps) {
+export default function StockAnalysisCard({ analysisData, symbol, apiCallDetails }: StockAnalysisCardProps) {
   if (!analysisData) {
     return (
       <Card className="border-border">
@@ -50,6 +53,7 @@ export default function StockAnalysisCard({ analysisData, symbol }: StockAnalysi
             <CardTitle className="text-lg font-semibold">{companyName}</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">Stock Analysis</p>
           </div>
+          <ApiCallDetails apiCallDetails={apiCallDetails} />
         </div>
       </CardHeader>
 

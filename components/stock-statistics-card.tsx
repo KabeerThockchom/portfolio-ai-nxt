@@ -1,13 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, DollarSign, BarChart3, Percent } from "lucide-react";
+import { ApiCallDetails } from "@/components/api-call-details";
+import { ApiCallMetadata } from "@/types";
 
 interface StockStatisticsCardProps {
   statisticsData: any;
   symbol: string;
+  apiCallDetails?: ApiCallMetadata;
 }
 
-export default function StockStatisticsCard({ statisticsData, symbol }: StockStatisticsCardProps) {
+export default function StockStatisticsCard({ statisticsData, symbol, apiCallDetails }: StockStatisticsCardProps) {
   if (!statisticsData || !statisticsData.defaultKeyStatistics) {
     return (
       <Card className="border-border">
@@ -73,6 +76,7 @@ export default function StockStatisticsCard({ statisticsData, symbol }: StockSta
             <CardTitle className="text-lg font-semibold">{companyName}</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">Key Statistics</p>
           </div>
+          <ApiCallDetails apiCallDetails={apiCallDetails} />
         </div>
       </CardHeader>
 
