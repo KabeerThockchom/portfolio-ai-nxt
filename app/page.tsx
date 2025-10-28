@@ -186,16 +186,23 @@ export default function Home() {
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
   const [llmResponseHistory, setLlmResponseHistory] = useState<string[]>([]);
   const [currentLlmMessage, setCurrentLlmMessage] = useState<string>("");
-  
+
+  // Conversation messages with role (user/assistant)
+  const [conversationMessages, setConversationMessages] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([]);
+  const [currentUserMessage, setCurrentUserMessage] = useState<string>("");
+
   // Animation direction state
   const [slideDirection, setSlideDirection] = useState<'none' | 'left' | 'right'>('none');
-  
+
   // Touch handling for swipe gestures
   const touchStartXRef = useRef<number | null>(null);
   const mainContentRef = useRef<HTMLDivElement>(null);
 
   // Add a ref to track the last message content for deduplication
   const lastMessageRef = useRef<string>("");
+
+  // Ref for auto-scrolling transcript
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
 
   const { toast } = useToast()
 
@@ -233,6 +240,11 @@ export default function Home() {
       }
     }
   }, []);
+
+  // Auto-scroll transcript to bottom when new messages arrive
+  useEffect(() => {
+    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [conversationMessages, currentLlmMessage]);
 
   // Handle help dialog close
   const handleHelpDialogChange = (open: boolean) => {
@@ -1116,6 +1128,9 @@ export default function Home() {
             },
           },
         ],
+        input_audio_transcription: {
+          model: "whisper-1"
+        },
       },
     }
     if (dataChannel.readyState === 'open') {
@@ -1136,6 +1151,8 @@ export default function Home() {
     // Clear previous session history when starting a new session
     await clearConversationHistory();
     setFunctionCallHistory([]); // Clear function call history
+    setConversationMessages([]); // Clear conversation messages
+    setCurrentLlmMessage(""); // Clear current message
 
     setIsListening(true);
     try {
@@ -1160,6 +1177,13 @@ export default function Home() {
         const msg = JSON.parse(ev.data);
         if (msg.type === "response.function_call_arguments.done") {
           handleFunctionCall(msg, dataChannel);
+        } else if (msg.type === "conversation.item.input_audio_transcription.completed") {
+          // User speech transcription completed
+          const userText = msg.transcript || "";
+          if (userText.trim()) {
+            setConversationMessages(prev => [...prev, { role: 'user', content: userText }]);
+            saveConversationMessage("user", userText);
+          }
         } else if (msg.type === "response.text.delta" || msg.type === "response.audio_transcript.delta") {
           if (msg.delta) {
             // Only update current message - don't add to history yet
@@ -1178,14 +1202,14 @@ export default function Home() {
               // Save to persistent storage
               saveConversationMessage("assistant", finalMessage);
 
-              // Add to history using the functional update to avoid race conditions
-              setLlmResponseHistory(prevHistory => {
-                // Check if this message is already in history to prevent duplicates
-                if (prevHistory.length > 0 && prevHistory[prevHistory.length - 1] === finalMessage) {
+              // Add to conversation messages with deduplication
+              setConversationMessages(prev => {
+                // Check if this message is already in the conversation to prevent duplicates
+                if (prev.length > 0 && prev[prev.length - 1].role === 'assistant' && prev[prev.length - 1].content === finalMessage) {
                   // Message already exists, don't add again
-                  return prevHistory;
+                  return prev;
                 }
-                return [...prevHistory, finalMessage];
+                return [...prev, { role: 'assistant', content: finalMessage }];
               });
             }
 
@@ -1267,6 +1291,7 @@ export default function Home() {
             dataChannelRef.current.send(JSON.stringify({ type: "response.create" }));
             // Save user message to history
             saveConversationMessage("user", prompt);
+            setConversationMessages(prev => [...prev, { role: 'user', content: prompt }]);
             toast({ title: "Prompt Sent", description: `Sent: "${prompt}"` });
           } else {
             toast({ title: "Assistant Not Ready", description: "Could not send prompt. Please try again.", variant: "destructive"});
@@ -1282,6 +1307,7 @@ export default function Home() {
       dataChannelRef.current.send(JSON.stringify({ type: "response.create" }));
       // Save user message to history
       saveConversationMessage("user", prompt);
+      setConversationMessages(prev => [...prev, { role: 'user', content: prompt }]);
       toast({ title: "Prompt Sent", description: `Sent: "${prompt}"` });
     } else {
         toast({ title: "Assistant Not Ready", description: "Could not send prompt. Please try again.", variant: "destructive"});
@@ -1677,20 +1703,37 @@ export default function Home() {
               <p className="text-sm font-medium mb-2 text-foreground">
                 Transcript
               </p>
-              <div className="overflow-y-auto flex-1 space-y-2 border border-border rounded-lg p-3 bg-muted/30">
-                {llmResponseHistory.map((text, index) => (
-                  <div key={index} className="text-sm text-muted-foreground p-2 bg-background rounded-md border border-border prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown>{text}</ReactMarkdown>
+              <div className="overflow-y-auto flex-1 space-y-3 border border-border rounded-lg p-3 bg-muted/30 max-h-[400px]">
+                {conversationMessages.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`flex ${message.role === 'user' ? 'justify-start' : 'justify-end'}`}
+                  >
+                    <div
+                      className={`
+                        text-sm p-3 rounded-lg max-w-[85%]
+                        prose prose-sm dark:prose-invert
+                        ${message.role === 'user'
+                          ? 'bg-blue-500/20 border border-blue-500/30 text-foreground'
+                          : 'bg-background border border-border text-muted-foreground'
+                        }
+                      `}
+                    >
+                      <ReactMarkdown>{message.content}</ReactMarkdown>
+                    </div>
                   </div>
                 ))}
                 {currentLlmMessage && (
-                  <div className="text-sm text-foreground p-2 bg-primary/10 rounded-md border border-primary/30 prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown>{currentLlmMessage}</ReactMarkdown>
+                  <div className="flex justify-end">
+                    <div className="text-sm p-3 rounded-lg max-w-[85%] bg-primary/10 border border-primary/30 text-foreground prose prose-sm dark:prose-invert">
+                      <ReactMarkdown>{currentLlmMessage}</ReactMarkdown>
+                    </div>
                   </div>
                 )}
-                {(llmResponseHistory.length === 0 && !currentLlmMessage) && (
-                  <p className="text-xs text-muted-foreground text-center py-4">Assistant responses will appear here.</p>
+                {(conversationMessages.length === 0 && !currentLlmMessage) && (
+                  <p className="text-xs text-muted-foreground text-center py-4">Conversation will appear here.</p>
                 )}
+                <div ref={transcriptEndRef} />
               </div>
             </div>
 
