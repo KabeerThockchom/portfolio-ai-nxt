@@ -14,6 +14,10 @@ import StockRecommendationTrendCard from "@/components/stock-recommendation-tren
 import StockEarningsCalendarCard from "@/components/stock-earnings-calendar-card"
 import TrendingTickersCard from "@/components/trending-tickers-card"
 import StockInsiderTransactionsCard from "@/components/stock-insider-transactions-card"
+import StockBalanceSheetCard from "@/components/stock-balance-sheet-card"
+import StockIncomeStatementCard from "@/components/stock-income-statement-card"
+import StockCashFlowCard from "@/components/stock-cash-flow-card"
+import ToolCallsPanel from "@/components/tool-calls-panel"
 import { useToast } from "@/hooks/use-toast"
 import StockChart from "@/components/stock-chart"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -66,9 +70,19 @@ interface ApiStockChartResponse {
 // Define the type for the dynamically imported module
 type RtcHelpersModule = typeof import('@/lib/webrtc-helpers');
 
+// Interface for function calls tracking
+interface FunctionCall {
+  id: string;
+  name: string;
+  parameters: Record<string, any>;
+  timestamp: number;
+  status: 'success' | 'error';
+  result?: any;
+}
+
 // Interface for history items - supports chart, profile, and statistics
 interface HistoryItem {
-  type: "chart" | "profile" | "statistics" | "analysis" | "recommendation-trend" | "earnings-calendar" | "trending-tickers" | "insider-transactions";
+  type: "chart" | "profile" | "statistics" | "analysis" | "recommendation-trend" | "earnings-calendar" | "trending-tickers" | "insider-transactions" | "balance-sheet" | "income-statement" | "cash-flow";
   symbol: string;
   // Chart-specific data
   chartData?: ChartData;
@@ -92,6 +106,10 @@ interface HistoryItem {
   trendingTickersRegion?: string;
   // Insider Transactions-specific data
   insiderTransactionsData?: any;
+  // Financial Statements-specific data
+  balanceSheetData?: any;
+  incomeStatementData?: any;
+  cashFlowData?: any;
 }
 
 const examplePrompts = [
@@ -104,7 +122,9 @@ const examplePrompts = [
   "What are the trending stocks today?",
   "Show me upcoming earnings this week",
   "Show me insider transactions for Apple",
-  "Google's stock price over the past year",
+  "Show me Apple's balance sheet",
+  "What's Tesla's income statement?",
+  "Show me Microsoft's cash flow statement",
 ];
 
 // Custom AutoAwesome icon component that mimics Material UI's AutoAwesome
@@ -138,6 +158,12 @@ export default function Home() {
   const [trendingTickersRegion, setTrendingTickersRegion] = useState<string>("")
   const [insiderTransactionsData, setInsiderTransactionsData] = useState<any | null>(null)
   const [insiderTransactionsSymbol, setInsiderTransactionsSymbol] = useState<string>("")
+  const [balanceSheetData, setBalanceSheetData] = useState<any | null>(null)
+  const [balanceSheetSymbol, setBalanceSheetSymbol] = useState<string>("")
+  const [incomeStatementDataState, setIncomeStatementDataState] = useState<any | null>(null)
+  const [incomeStatementSymbol, setIncomeStatementSymbol] = useState<string>("")
+  const [cashFlowDataState, setCashFlowDataState] = useState<any | null>(null)
+  const [cashFlowSymbol, setCashFlowSymbol] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [rtcHelpers, setRtcHelpers] = useState<RtcHelpersModule | null>(null);
@@ -145,6 +171,9 @@ export default function Home() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
   const [showHelpGlow, setShowHelpGlow] = useState(false);
+
+  // State for tracking function calls
+  const [functionCallHistory, setFunctionCallHistory] = useState<FunctionCall[]>([]);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
   const dataChannelRef = useRef<RTCDataChannel | null>(null)
@@ -406,6 +435,22 @@ export default function Home() {
     }
   }, []);
 
+  const fetchFinancials = useCallback(async (args: any): Promise<ApiStockChartResponse | { success: false; error: string }> => {
+    try {
+      const { symbol, region, lang } = args
+      const params = new URLSearchParams()
+      params.append("symbol", symbol)
+      if (region) params.append("region", region)
+      if (lang) params.append("lang", lang)
+      const response = await fetch(`/api/stock/financials?${params.toString()}`)
+      if (!response.ok) throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching financials:", error)
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error fetching financials" }
+    }
+  }, []);
+
   // Define stopAssistant before it's used in handleFunctionCall
   const stopAssistant = useCallback(() => {
     if (peerConnectionRef.current) {
@@ -427,6 +472,17 @@ export default function Home() {
     try {
       const args = JSON.parse(msg.arguments)
       let apiResponse: ApiStockChartResponse | { success: false, error: string } | undefined;
+
+      // Log the function call
+      const callId = `${msg.name}-${Date.now()}`;
+      const functionCall: FunctionCall = {
+        id: callId,
+        name: msg.name,
+        parameters: args,
+        timestamp: Date.now(),
+        status: 'success', // Will update if error occurs
+      };
+      setFunctionCallHistory(prev => [...prev, functionCall]);
 
       if (msg.name === "getStockChart") {
         setIsLoading(true)
@@ -704,6 +760,123 @@ export default function Home() {
           setInsiderTransactionsData(null)
         }
         setIsLoading(false)
+      } else if (msg.name === "getBalanceSheet") {
+        setIsLoading(true)
+        setShowComponents(false);
+        // Clear other content types
+        setChartData(null);
+        setProfileData(null);
+        setStatisticsData(null);
+        setAnalysisData(null);
+        setRecommendationTrendData(null);
+        setEarningsCalendarData(null);
+        setTrendingTickersData(null);
+        setInsiderTransactionsData(null);
+        setIncomeStatementDataState(null);
+        setCashFlowDataState(null);
+
+        apiResponse = await fetchFinancials(args)
+        if (apiResponse && apiResponse.success && (apiResponse as any).financialsData) {
+          const newFinancialsData = (apiResponse as any).financialsData;
+          setBalanceSheetData(newFinancialsData)
+          setBalanceSheetSymbol(args.symbol)
+
+          // Add to history
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "balance-sheet",
+              symbol: args.symbol,
+              balanceSheetData: newFinancialsData,
+            };
+            const updatedHistory = [...prevHistory, newEntry];
+            setCurrentHistoryIndex(updatedHistory.length - 1);
+            return updatedHistory;
+          });
+
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150);
+        } else if (apiResponse && !apiResponse.success) {
+          toast({ title: "Error fetching balance sheet", description: apiResponse.error, variant: "destructive" });
+          setBalanceSheetData(null)
+        }
+        setIsLoading(false)
+      } else if (msg.name === "getIncomeStatement") {
+        setIsLoading(true)
+        setShowComponents(false);
+        // Clear other content types
+        setChartData(null);
+        setProfileData(null);
+        setStatisticsData(null);
+        setAnalysisData(null);
+        setRecommendationTrendData(null);
+        setEarningsCalendarData(null);
+        setTrendingTickersData(null);
+        setInsiderTransactionsData(null);
+        setBalanceSheetData(null);
+        setCashFlowDataState(null);
+
+        apiResponse = await fetchFinancials(args)
+        if (apiResponse && apiResponse.success && (apiResponse as any).financialsData) {
+          const newFinancialsData = (apiResponse as any).financialsData;
+          setIncomeStatementDataState(newFinancialsData)
+          setIncomeStatementSymbol(args.symbol)
+
+          // Add to history
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "income-statement",
+              symbol: args.symbol,
+              incomeStatementData: newFinancialsData,
+            };
+            const updatedHistory = [...prevHistory, newEntry];
+            setCurrentHistoryIndex(updatedHistory.length - 1);
+            return updatedHistory;
+          });
+
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150);
+        } else if (apiResponse && !apiResponse.success) {
+          toast({ title: "Error fetching income statement", description: apiResponse.error, variant: "destructive" });
+          setIncomeStatementDataState(null)
+        }
+        setIsLoading(false)
+      } else if (msg.name === "getCashFlow") {
+        setIsLoading(true)
+        setShowComponents(false);
+        // Clear other content types
+        setChartData(null);
+        setProfileData(null);
+        setStatisticsData(null);
+        setAnalysisData(null);
+        setRecommendationTrendData(null);
+        setEarningsCalendarData(null);
+        setTrendingTickersData(null);
+        setInsiderTransactionsData(null);
+        setBalanceSheetData(null);
+        setIncomeStatementDataState(null);
+
+        apiResponse = await fetchFinancials(args)
+        if (apiResponse && apiResponse.success && (apiResponse as any).financialsData) {
+          const newFinancialsData = (apiResponse as any).financialsData;
+          setCashFlowDataState(newFinancialsData)
+          setCashFlowSymbol(args.symbol)
+
+          // Add to history
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "cash-flow",
+              symbol: args.symbol,
+              cashFlowData: newFinancialsData,
+            };
+            const updatedHistory = [...prevHistory, newEntry];
+            setCurrentHistoryIndex(updatedHistory.length - 1);
+            return updatedHistory;
+          });
+
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150);
+        } else if (apiResponse && !apiResponse.success) {
+          toast({ title: "Error fetching cash flow statement", description: apiResponse.error, variant: "destructive" });
+          setCashFlowDataState(null)
+        }
+        setIsLoading(false)
       } else if (msg.name === "muteAssistant") {
         // Allow the assistant to end the conversation
         stopAssistant();
@@ -731,6 +904,18 @@ export default function Home() {
     } catch (error) {
       console.error("Error handling function call:", error)
       const errorMessage = error instanceof Error ? error.message : "Unknown error in function call";
+
+      // Update the function call as error
+      setFunctionCallHistory(prev => {
+        const updated = [...prev];
+        const lastCall = updated[updated.length - 1];
+        if (lastCall) {
+          lastCall.status = 'error';
+          lastCall.result = errorMessage;
+        }
+        return updated;
+      });
+
       const event = {
         type: "conversation.item.create",
         item: {
@@ -744,7 +929,7 @@ export default function Home() {
          dataChannelRef.current.send(JSON.stringify({ type: "response.create" }))
       }
     }
-  }, [toast, fetchStockChart, fetchStockProfile, fetchStockStatistics, fetchStockAnalysis, fetchStockRecommendationTrend, fetchEarningsCalendar, fetchTrendingTickers, fetchInsiderTransactions, stopAssistant]);
+  }, [toast, fetchStockChart, fetchStockProfile, fetchStockStatistics, fetchStockAnalysis, fetchStockRecommendationTrend, fetchEarningsCalendar, fetchTrendingTickers, fetchInsiderTransactions, fetchFinancials, stopAssistant]);
 
   const configureDataChannel = useCallback((dataChannel: RTCDataChannel) => {
     const event = {
@@ -878,6 +1063,48 @@ export default function Home() {
           },
           {
             type: "function",
+            name: "getBalanceSheet",
+            description: "Fetches balance sheet data for a given stock symbol, showing assets, liabilities, and shareholders' equity over time. Displays both annual and quarterly data with trends. Use this to understand a company's financial position and health.",
+            parameters: {
+              type: "object",
+              properties: {
+                symbol: { type: "string", description: "Stock symbol (e.g., AAPL, TSLA, MSFT)" },
+                region: { type: "string", description: "Region code (default: US)" },
+                lang: { type: "string", description: "Language code (default: en-US)" },
+              },
+              required: ["symbol"],
+            },
+          },
+          {
+            type: "function",
+            name: "getIncomeStatement",
+            description: "Fetches income statement data for a given stock symbol, showing revenue, expenses, and profitability over time. Displays both annual and quarterly data with trends for net income and profit margins. Use this to understand a company's profitability and operational performance.",
+            parameters: {
+              type: "object",
+              properties: {
+                symbol: { type: "string", description: "Stock symbol (e.g., AAPL, TSLA, MSFT)" },
+                region: { type: "string", description: "Region code (default: US)" },
+                lang: { type: "string", description: "Language code (default: en-US)" },
+              },
+              required: ["symbol"],
+            },
+          },
+          {
+            type: "function",
+            name: "getCashFlow",
+            description: "Fetches cash flow statement data for a given stock symbol, showing operating, investing, and financing cash flows over time. Displays both annual and quarterly data with trends. Use this to understand how a company generates and uses cash.",
+            parameters: {
+              type: "object",
+              properties: {
+                symbol: { type: "string", description: "Stock symbol (e.g., AAPL, TSLA, MSFT)" },
+                region: { type: "string", description: "Region code (default: US)" },
+                lang: { type: "string", description: "Language code (default: en-US)" },
+              },
+              required: ["symbol"],
+            },
+          },
+          {
+            type: "function",
             name: "muteAssistant",
             description: "Allows the assistant to end the current conversation",
             parameters: {
@@ -908,6 +1135,7 @@ export default function Home() {
 
     // Clear previous session history when starting a new session
     await clearConversationHistory();
+    setFunctionCallHistory([]); // Clear function call history
 
     setIsListening(true);
     try {
@@ -1086,6 +1314,9 @@ export default function Home() {
         setEarningsCalendarData(null);
         setTrendingTickersData(null);
         setInsiderTransactionsData(null);
+        setBalanceSheetData(null);
+        setIncomeStatementDataState(null);
+        setCashFlowDataState(null);
 
         // Second timeout: Restore new states after clearing has rendered
         setTimeout(() => {
@@ -1117,6 +1348,15 @@ export default function Home() {
           } else if (historyItem.type === "insider-transactions") {
             setInsiderTransactionsData(historyItem.insiderTransactionsData);
             setInsiderTransactionsSymbol(historyItem.symbol);
+          } else if (historyItem.type === "balance-sheet") {
+            setBalanceSheetData(historyItem.balanceSheetData);
+            setBalanceSheetSymbol(historyItem.symbol);
+          } else if (historyItem.type === "income-statement") {
+            setIncomeStatementDataState(historyItem.incomeStatementData);
+            setIncomeStatementSymbol(historyItem.symbol);
+          } else if (historyItem.type === "cash-flow") {
+            setCashFlowDataState(historyItem.cashFlowData);
+            setCashFlowSymbol(historyItem.symbol);
           }
 
           setCurrentHistoryIndex(index);
@@ -1521,11 +1761,24 @@ export default function Home() {
                 </Button>
               </div>
             )}
-            
-            {/* Main Content Card - Shows Chart, Profile, Statistics, Analysis, or Trending Tickers */}
+
+            {/* Tool Calls Panel - Always show at top if there are function calls */}
+            {functionCallHistory.length > 0 && (
+              <div
+                className={`transition-all duration-500 ease-out ${
+                  showComponents
+                    ? "opacity-100 translate-y-0"
+                    : "opacity-0 -translate-y-4"
+                }`}
+              >
+                <ToolCallsPanel functionCalls={functionCallHistory} />
+              </div>
+            )}
+
+            {/* Main Content Card - Shows Chart, Profile, Statistics, Analysis, Trending Tickers, or Financial Statements */}
             <div
               className={`transition-all duration-700 ease-out ${
-                showComponents && (chartData || profileData || statisticsData || analysisData || recommendationTrendData || earningsCalendarData || trendingTickersData || insiderTransactionsData)
+                showComponents && (chartData || profileData || statisticsData || analysisData || recommendationTrendData || earningsCalendarData || trendingTickersData || insiderTransactionsData || balanceSheetData || incomeStatementDataState || cashFlowDataState)
                   ? "opacity-100 " +
                     (slideDirection === 'left'
                       ? 'animate-slide-in-from-right'
@@ -1690,12 +1943,27 @@ export default function Home() {
               )}
 
               {/* Show Insider Transactions */}
-              {insiderTransactionsData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && (
+              {insiderTransactionsData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && (
                 <StockInsiderTransactionsCard insiderTransactionsData={insiderTransactionsData} symbol={insiderTransactionsSymbol} />
               )}
 
+              {/* Show Balance Sheet */}
+              {balanceSheetData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !incomeStatementDataState && !cashFlowDataState && (
+                <StockBalanceSheetCard financialsData={balanceSheetData} symbol={balanceSheetSymbol} />
+              )}
+
+              {/* Show Income Statement */}
+              {incomeStatementDataState && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !cashFlowDataState && (
+                <StockIncomeStatementCard financialsData={incomeStatementDataState} symbol={incomeStatementSymbol} />
+              )}
+
+              {/* Show Cash Flow */}
+              {cashFlowDataState && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && (
+                <StockCashFlowCard financialsData={cashFlowDataState} symbol={cashFlowSymbol} />
+              )}
+
               {/* Show loading or empty state */}
-              {!chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && (
+              {!chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && (
                 <Card className="border-border">
                   <CardContent className="p-6">
                     {isLoading ? (

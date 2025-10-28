@@ -36,7 +36,8 @@ export async function GET(request: Request) {
     }
 
     const response = await fetch(
-      "https://fsodnaopenai2.openai.azure.com/openai/realtimeapi/sessions?api-version=2025-04-01-preview",
+      // "https://fsodnaopenai2.openai.azure.com/openai/realtimeapi/sessions?api-version=2025-04-01-preview",
+      "https://voiceaistudio9329552017.cognitiveservices.azure.com/openai/realtime?api-version=2024-10-01-preview",
       {
         method: "POST",
         headers: {
@@ -44,7 +45,7 @@ export async function GET(request: Request) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "gpt-4o-realtime-preview",
+          model: "gpt-realtime",
           voice: "verse",
           instructions: `You are Portfolio AI, a warm, empathetic, and knowledgeable financial advisor.
 
