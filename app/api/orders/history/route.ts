@@ -38,6 +38,7 @@ export async function GET(request: Request) {
       amount: order_book.amount,
       settlementDate: order_book.settlementDate,
       orderStatus: order_book.orderStatus as "Placed" | "Under Review" | "Cancelled" | "Executed",
+      confirmationStatus: order_book.confirmationStatus as "pending_confirmation" | "confirmed" | "rejected",
       orderDate: order_book.orderDate,
       asset: asset_type || undefined,
     }))

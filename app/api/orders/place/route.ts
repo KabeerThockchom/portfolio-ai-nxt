@@ -30,33 +30,80 @@ export async function POST(request: Request) {
       )
     }
 
-    // Find the asset
-    const assets = await db
+    // Find the asset or create it if it doesn't exist
+    let assets = await db
       .select()
       .from(assetType)
       .where(eq(assetType.assetTicker, symbol))
       .limit(1)
 
-    if (assets.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Asset with ticker ${symbol} not found`,
-        },
-        { status: 404 }
-      )
-    }
+    let asset
 
-    const asset = assets[0]
+    if (assets.length === 0) {
+      // Asset doesn't exist in database - create it on-the-fly
+      console.log(`Asset ${symbol} not found in database, creating new asset record...`)
+
+      // Try to fetch company name from stock profile API
+      let assetName = symbol // Default to ticker if we can't fetch name
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+        const profileResponse = await fetch(`${baseUrl}/api/stock/profile?symbol=${symbol}&region=US`)
+        const profileData = await profileResponse.json()
+
+        if (profileData.success && profileData.data?.quoteSummary?.result?.[0]?.price?.longName) {
+          assetName = profileData.data.quoteSummary.result[0].price.longName
+        } else if (profileData.success && profileData.data?.quoteSummary?.result?.[0]?.price?.shortName) {
+          assetName = profileData.data.quoteSummary.result[0].price.shortName
+        }
+      } catch (error) {
+        console.warn(`Could not fetch name for ${symbol}, using ticker as name`)
+      }
+
+      // Insert new asset into database
+      const newAsset = {
+        assetTicker: symbol,
+        assetName: assetName,
+        assetClass: "Stock", // Default to Stock for unknown assets
+        oneYrVolatility: null,
+        similarAsset: null,
+        category: null,
+        assetManager: null,
+        portfolioComposition: null,
+        concentration: null,
+      }
+
+      const insertedAssets = await db
+        .insert(assetType)
+        .values(newAsset)
+        .returning()
+
+      asset = insertedAssets[0]
+      console.log(`Created new asset: ${asset.assetTicker} (ID: ${asset.assetId})`)
+    } else {
+      asset = assets[0]
+    }
 
     // Get latest price for Market Open orders
     let unitPrice = price || 0
 
     if (orderType === "Market Open" && !price) {
-      // For Market Open, we'd typically get the current market price
-      // For now, use the last known price from asset history or a default
-      // In production, this should fetch from a real-time price API
-      unitPrice = 100 // Placeholder - replace with real price fetch
+      // Fetch real-time price from Yahoo Finance
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+        const quoteResponse = await fetch(`${baseUrl}/api/stock/quote?symbol=${symbol}`)
+        const quoteData = await quoteResponse.json()
+
+        if (quoteData.success && quoteData.data?.price) {
+          unitPrice = quoteData.data.price
+        } else {
+          // Fallback to 100 if API fails
+          console.warn(`Failed to fetch price for ${symbol}, using fallback price`)
+          unitPrice = 100
+        }
+      } catch (error) {
+        console.error(`Error fetching real-time price for ${symbol}:`, error)
+        unitPrice = 100 // Fallback to 100 if API call fails
+      }
     }
 
     const amount = qty * unitPrice

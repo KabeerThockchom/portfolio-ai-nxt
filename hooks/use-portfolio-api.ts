@@ -10,6 +10,8 @@ import type {
   ReturnsAttributionResponse,
   RelativePerformanceRequest,
   RelativePerformanceResponse,
+  PriceTrendRequest,
+  PriceTrendResponse,
   CashBalanceResponse,
   PlaceOrderRequest,
   PlaceOrderResponse,
@@ -26,6 +28,8 @@ import type {
   ConfirmOrderResponse,
   RejectOrderRequest,
   RejectOrderResponse,
+  UpdateOrderRequest,
+  UpdateOrderResponse,
   TransactionHistoryResponse,
 } from "@/types/portfolio"
 
@@ -152,6 +156,16 @@ export function usePortfolioApi() {
     return response.json()
   }
 
+  // Update order
+  const updateOrder = async (request: UpdateOrderRequest): Promise<UpdateOrderResponse> => {
+    const response = await fetch("/api/orders/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    })
+    return response.json()
+  }
+
   // Get account list
   const fetchAccountList = async (userId: number): Promise<AccountListResponse> => {
     const response = await fetch(`/api/accounts/list?userId=${userId}`)
@@ -207,6 +221,18 @@ export function usePortfolioApi() {
     return response.json()
   }
 
+  // Price trend analysis
+  const fetchPriceTrend = async (
+    request: PriceTrendRequest
+  ): Promise<PriceTrendResponse> => {
+    const response = await fetch("/api/portfolio/price-trend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    })
+    return response.json()
+  }
+
   return {
     fetchPortfolioHoldings,
     fetchPortfolioAggregation,
@@ -214,12 +240,14 @@ export function usePortfolioApi() {
     fetchPortfolioRisk,
     fetchReturnsAttribution,
     fetchRelativePerformance,
+    fetchPriceTrend,
     fetchCashBalance,
     placeOrder,
     fetchOrderHistory,
     cancelOrder,
     confirmOrder,
     rejectOrder,
+    updateOrder,
     fetchAccountList,
     fetchAccountBalance,
     createAccount,

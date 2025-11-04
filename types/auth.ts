@@ -24,7 +24,7 @@ export interface LoginRequest {
 }
 
 export interface VoiceLoginRequest {
-  phonenumber: string
+  name: string
   date_of_birth: string
 }
 

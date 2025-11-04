@@ -80,6 +80,10 @@ export function WaterfallChart({ data, title, subtitle }: WaterfallChartProps) {
       },
     },
     tooltip: {
+      theme: "light",
+      style: {
+        fontSize: "12px",
+      },
       y: {
         formatter: function (val: number) {
           return val >= 0 ? `+$${val.toLocaleString()}` : `-$${Math.abs(val).toLocaleString()}`

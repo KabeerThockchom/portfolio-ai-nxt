@@ -60,10 +60,17 @@ export function BenchmarkChart({ data, benchmarkName, title, subtitle }: Benchma
     tooltip: {
       shared: true,
       intersect: false,
+      theme: "light",
+      style: {
+        fontSize: "12px",
+      },
       y: {
         formatter: function (val: number) {
           return val.toFixed(2)
         },
+      },
+      x: {
+        show: true,
       },
     },
     legend: {

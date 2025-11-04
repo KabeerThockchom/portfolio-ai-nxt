@@ -1,61 +1,61 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db/connection"
 import { users } from "@/lib/db/schema"
-import { eq } from "drizzle-orm"
+import { eq, and } from "drizzle-orm"
 
 /**
  * Voice Authentication endpoint
- * GET /api/auth/voice-login?phone=xxx&dob=yyyy-mm-dd
+ * GET /api/auth/voice-login?name=xxx&dob=yyyy-mm-dd
  *
- * Authenticate user via phone number and date of birth
+ * Authenticate user via full name and date of birth
  * Used by AI voice assistant
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const phone = searchParams.get("phone")
+    const name = searchParams.get("name")
     const dob = searchParams.get("dob")
 
     // Validate required parameters
-    if (!phone || !dob) {
+    if (!name || !dob) {
       return NextResponse.json(
         {
           success: false,
-          message: "Phone number and date of birth are required",
+          message: "Name and date of birth are required",
         },
         { status: 400 }
       )
     }
 
-    // Query user by phone number
-    const user = await db
+    // Query user by name and date of birth
+    const matchingUsers = await db
       .select()
       .from(users)
-      .where(eq(users.phoneNumber, phone))
-      .limit(1)
+      .where(and(eq(users.name, name), eq(users.dob, dob)))
 
-    if (!user || user.length === 0) {
+    // Check for no match
+    if (!matchingUsers || matchingUsers.length === 0) {
       return NextResponse.json(
         {
           success: false,
-          message: "User not found with this phone number",
+          message: "No user found with this name and date of birth",
         },
         { status: 404 }
       )
     }
 
-    const dbUser = user[0]
-
-    // Verify date of birth
-    if (dob !== dbUser.dob) {
+    // Check for multiple matches (should not happen with unique users)
+    if (matchingUsers.length > 1) {
       return NextResponse.json(
         {
           success: false,
-          message: "Date of birth does not match",
+          message: "Multiple users found with this name and date of birth. Please contact support.",
         },
-        { status: 401 }
+        { status: 409 } // Conflict
       )
     }
+
+    const dbUser = matchingUsers[0]
 
     // Transform database field names to match response format
     const responseUser = {

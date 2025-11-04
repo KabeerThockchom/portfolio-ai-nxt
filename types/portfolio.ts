@@ -260,6 +260,7 @@ export interface RiskAnalysisRequest {
 export interface ReturnsAttributionRequest {
   userId: number
   dimension: "asset_class" | "sector" | "ticker"
+  period?: "1m" | "3m" | "6m" | "1y" | "2y" | "3y" | "5y"
 }
 
 export interface RelativePerformanceRequest {
@@ -288,6 +289,13 @@ export interface ConfirmOrderRequest {
 
 export interface RejectOrderRequest {
   orderId: number
+}
+
+export interface UpdateOrderRequest {
+  orderId: number
+  qty?: number
+  orderType?: "Market Open" | "Limit"
+  limitPrice?: number
 }
 
 export interface DepositRequest {
@@ -373,6 +381,11 @@ export type RejectOrderResponse = ApiResponse<{
   message: string
 }>
 
+export type UpdateOrderResponse = ApiResponse<{
+  order: Order
+  message: string
+}>
+
 export type AccountListResponse = ApiResponse<{
   accounts: Account[]
   totalCash: number
@@ -426,4 +439,36 @@ export type CashBalanceResponse = ApiResponse<{
   cashBalance: number
   totalPortfolioValue: number
   totalInvested: number
+}>
+
+// Price trend types
+export interface PriceTrendRequest {
+  userId: number
+  tickers?: string[]
+  timeHistory: number
+}
+
+export interface PriceTrendData {
+  ticker: string
+  assetName: string
+  priceHistory: Array<{
+    date: string
+    price: number
+    percentChange: number
+  }>
+  startPrice: number
+  currentPrice: number
+  totalReturn: number
+  totalReturnPercent: number
+}
+
+export type PriceTrendResponse = ApiResponse<{
+  trends: PriceTrendData[]
+  chartData: {
+    categories: string[]
+    series: Array<{
+      name: string
+      data: number[]
+    }>
+  }
 }>

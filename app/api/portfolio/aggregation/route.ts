@@ -5,7 +5,6 @@ import {
   assetType,
   assetHistory,
   assetSector,
-  userAccounts,
 } from "@/lib/db/schema"
 import { eq, and, desc, sql } from "drizzle-orm"
 import type {
@@ -75,14 +74,23 @@ export async function POST(request: Request) {
       holdings.map(async ({ user_portfolio, asset_type }) => {
         if (!asset_type) return null
 
-        const latestPriceRecord = await db
-          .select()
-          .from(assetHistory)
-          .where(eq(assetHistory.assetId, asset_type.assetId))
-          .orderBy(desc(assetHistory.date))
-          .limit(1)
+        // For Cash, use $1.00 per unit (no price history needed)
+        // For other assets, fetch latest price from history
+        let latestClosePrice: number
 
-        const latestClosePrice = latestPriceRecord[0]?.closePrice || 0
+        if (asset_type.assetClass === "Cash") {
+          latestClosePrice = 1.0
+        } else {
+          const latestPriceRecord = await db
+            .select()
+            .from(assetHistory)
+            .where(eq(assetHistory.assetId, asset_type.assetId))
+            .orderBy(desc(assetHistory.date))
+            .limit(1)
+
+          // Fallback to average cost if no price history exists
+          latestClosePrice = latestPriceRecord[0]?.closePrice || user_portfolio.avgCostPerUnit || 0
+        }
         const currentAmount = user_portfolio.assetTotalUnits * latestClosePrice
         const gainLoss = currentAmount - user_portfolio.investmentAmount
         const gainLossPercent =
@@ -100,14 +108,6 @@ export async function POST(request: Request) {
     )
 
     const validHoldings = enrichedHoldings.filter((h) => h !== null)
-
-    // Get total cash from all user accounts
-    const accounts = await db
-      .select()
-      .from(userAccounts)
-      .where(eq(userAccounts.userId, userId))
-
-    const totalCash = accounts.reduce((sum, acc) => sum + acc.cashBalance, 0)
 
     // Aggregate by dimension
     let aggregationMap = new Map<string, PortfolioAggregation>()
@@ -189,22 +189,8 @@ export async function POST(request: Request) {
 
     let aggregation = Array.from(aggregationMap.values())
 
-    // Add cash to aggregation (only for asset_class dimension)
-    // Only add if Cash doesn't already exist (to avoid duplicates from user_portfolio)
-    if (dimension === "asset_class" && totalCash > 0) {
-      const existingCash = aggregation.find((a) => a.label === "Cash")
-      if (!existingCash) {
-        // No cash in portfolio, add it from accounts
-        aggregation.push({
-          dimension: "asset_class",
-          label: "Cash",
-          totalValue: totalCash,
-          percentageReturn: 0, // Cash has no return
-          count: accounts.length,
-        })
-      }
-      // If Cash already exists from user_portfolio, don't add from accounts (avoid double-counting)
-    }
+    // Cash is now handled in user_portfolio with special price logic ($1.00 per unit)
+    // No need to add cash from separate accounts table
 
     // Multi-level aggregation for donut charts (asset class -> sectors)
     if (multiLevel && dimension === "asset_class") {

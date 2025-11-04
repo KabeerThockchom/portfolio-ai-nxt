@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Mic, MicOff, BarChart4, Info, ChevronLeft, ChevronRight, Sparkles, HelpCircle, TrendingUp, Users } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import StockInfoPanel from "@/components/stock-info-panel"
@@ -34,6 +35,10 @@ import { DonutChart } from "@/components/portfolio/donut-chart"
 import { BubbleChart } from "@/components/portfolio/bubble-chart"
 import { GaugeChart } from "@/components/portfolio/gauge-chart"
 import { HoldingsTable } from "@/components/portfolio/holdings-table"
+import { BenchmarkChart } from "@/components/portfolio/benchmark-chart"
+import { WaterfallChart } from "@/components/portfolio/waterfall-chart"
+import { PriceTrendChart } from "@/components/portfolio/price-trend-chart"
+import { OrderHistoryTable } from "@/components/portfolio/order-history-table"
 
 // Define types for chartData
 interface ChartMeta {
@@ -175,6 +180,14 @@ export default function Home() {
   const [portfolioHoldingsData, setPortfolioHoldingsData] = useState<any | null>(null)
   const [portfolioAggregationData, setPortfolioAggregationData] = useState<any | null>(null)
   const [portfolioRiskData, setPortfolioRiskData] = useState<any | null>(null)
+  const [portfolioBenchmarkData, setPortfolioBenchmarkData] = useState<any | null>(null)
+  const [portfolioRelativePerformanceData, setPortfolioRelativePerformanceData] = useState<any | null>(null)
+  const [portfolioAttributionData, setPortfolioAttributionData] = useState<any | null>(null)
+  const [portfolioPriceTrendData, setPortfolioPriceTrendData] = useState<any | null>(null)
+
+  // Order state
+  const [orderHistoryData, setOrderHistoryData] = useState<any | null>(null)
+  const [orderPreviewData, setOrderPreviewData] = useState<any | null>(null)
 
   // API metadata state
   const [chartApiDetails, setChartApiDetails] = useState<ApiCallMetadata | undefined>(undefined)
@@ -1134,6 +1147,10 @@ export default function Home() {
           setCashFlowDataState(null)
           setPortfolioAggregationData(null)
           setPortfolioRiskData(null)
+          setPortfolioBenchmarkData(null)
+          setPortfolioRelativePerformanceData(null)
+          setPortfolioAttributionData(null)
+          setPortfolioPriceTrendData(null)
 
           const newPortfolioHoldingsData = apiResponse.data
           setPortfolioHoldingsData(newPortfolioHoldingsData)
@@ -1182,6 +1199,10 @@ export default function Home() {
           setCashFlowDataState(null)
           setPortfolioHoldingsData(null)
           setPortfolioRiskData(null)
+          setPortfolioBenchmarkData(null)
+          setPortfolioRelativePerformanceData(null)
+          setPortfolioAttributionData(null)
+          setPortfolioPriceTrendData(null)
 
           const newPortfolioAggregationData = apiResponse.data
           setPortfolioAggregationData(newPortfolioAggregationData)
@@ -1228,6 +1249,10 @@ export default function Home() {
           setCashFlowDataState(null)
           setPortfolioHoldingsData(null)
           setPortfolioAggregationData(null)
+          setPortfolioBenchmarkData(null)
+          setPortfolioRelativePerformanceData(null)
+          setPortfolioAttributionData(null)
+          setPortfolioPriceTrendData(null)
 
           const newPortfolioRiskData = apiResponse.data
           setPortfolioRiskData(newPortfolioRiskData)
@@ -1261,10 +1286,46 @@ export default function Home() {
           history: args.history
         })
 
-        if (apiResponse.success) {
+        if (apiResponse.success && apiResponse.data) {
+          // Clear all other content first
+          setChartData(null)
+          setProfileData(null)
+          setStatisticsData(null)
+          setAnalysisData(null)
+          setRecommendationTrendData(null)
+          setEarningsCalendarData(null)
+          setTrendingTickersData(null)
+          setInsiderTransactionsData(null)
+          setBalanceSheetData(null)
+          setIncomeStatementDataState(null)
+          setCashFlowDataState(null)
+          setPortfolioHoldingsData(null)
+          setPortfolioAggregationData(null)
+          setPortfolioRiskData(null)
+          setPortfolioRelativePerformanceData(null)
+          setPortfolioAttributionData(null)
+          setPortfolioPriceTrendData(null)
+
+          const newBenchmarkData = apiResponse.data
+          setPortfolioBenchmarkData(newBenchmarkData)
+
+          // Add to history
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "portfolio-benchmark",
+              symbol: "Portfolio",
+              portfolioBenchmarkData: newBenchmarkData,
+            }
+            const updatedHistory = [...prevHistory, newEntry]
+            setCurrentHistoryIndex(updatedHistory.length - 1)
+            return updatedHistory
+          })
+
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150)
+
           toast({
             title: "Benchmark Comparison",
-            description: `Compared portfolio against ${args.benchmark}`
+            description: `Compared portfolio against ${args.benchmark} over ${args.history} year(s)`
           })
         }
       } else if (msg.name === "getReturnsAttribution") {
@@ -1272,13 +1333,50 @@ export default function Home() {
         const userId = args.userId || 1
         apiResponse = await portfolioApi.fetchReturnsAttribution({
           userId,
-          dimension: args.dimension
+          dimension: args.dimension,
+          period: args.period
         })
 
-        if (apiResponse.success) {
+        if (apiResponse.success && apiResponse.data) {
+          // Clear all other content first
+          setChartData(null)
+          setProfileData(null)
+          setStatisticsData(null)
+          setAnalysisData(null)
+          setRecommendationTrendData(null)
+          setEarningsCalendarData(null)
+          setTrendingTickersData(null)
+          setInsiderTransactionsData(null)
+          setBalanceSheetData(null)
+          setIncomeStatementDataState(null)
+          setCashFlowDataState(null)
+          setPortfolioHoldingsData(null)
+          setPortfolioAggregationData(null)
+          setPortfolioRiskData(null)
+          setPortfolioBenchmarkData(null)
+          setPortfolioRelativePerformanceData(null)
+          setPortfolioPriceTrendData(null)
+
+          const newAttributionData = apiResponse.data
+          setPortfolioAttributionData(newAttributionData)
+
+          // Add to history
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "portfolio-attribution",
+              symbol: "Portfolio",
+              portfolioAttributionData: newAttributionData,
+            }
+            const updatedHistory = [...prevHistory, newEntry]
+            setCurrentHistoryIndex(updatedHistory.length - 1)
+            return updatedHistory
+          })
+
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150)
+
           toast({
             title: "Returns Attribution",
-            description: `Total return: ${apiResponse.data?.totalReturn.toFixed(2)}%`
+            description: `Total return: $${apiResponse.data.totalReturn.toLocaleString()} by ${args.dimension}`
           })
         }
       } else if (msg.name === "getRelativePerformance") {
@@ -1289,10 +1387,97 @@ export default function Home() {
           period: args.period
         })
 
-        if (apiResponse.success) {
+        if (apiResponse.success && apiResponse.data) {
+          // Clear all other content first
+          setChartData(null)
+          setProfileData(null)
+          setStatisticsData(null)
+          setAnalysisData(null)
+          setRecommendationTrendData(null)
+          setEarningsCalendarData(null)
+          setTrendingTickersData(null)
+          setInsiderTransactionsData(null)
+          setBalanceSheetData(null)
+          setIncomeStatementDataState(null)
+          setCashFlowDataState(null)
+          setPortfolioHoldingsData(null)
+          setPortfolioAggregationData(null)
+          setPortfolioRiskData(null)
+          setPortfolioBenchmarkData(null)
+          setPortfolioAttributionData(null)
+          setPortfolioPriceTrendData(null)
+
+          const newRelativePerformanceData = apiResponse.data
+          setPortfolioRelativePerformanceData(newRelativePerformanceData)
+
+          // Add to history
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "portfolio-relative-performance",
+              symbol: "Portfolio",
+              portfolioRelativePerformanceData: newRelativePerformanceData,
+            }
+            const updatedHistory = [...prevHistory, newEntry]
+            setCurrentHistoryIndex(updatedHistory.length - 1)
+            return updatedHistory
+          })
+
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150)
+
           toast({
             title: "Relative Performance",
-            description: `Analyzed ${apiResponse.data?.performance.length} holdings`
+            description: `Analyzed ${apiResponse.data.performance.length} holdings over ${args.period}`
+          })
+        }
+      } else if (msg.name === "getPriceTrend") {
+        // Price trend analysis
+        const userId = args.userId || 1
+        apiResponse = await portfolioApi.fetchPriceTrend({
+          userId,
+          tickers: args.tickers,
+          timeHistory: args.timeHistory || 2
+        })
+
+        if (apiResponse.success && apiResponse.data) {
+          // Clear all other content first
+          setChartData(null)
+          setProfileData(null)
+          setStatisticsData(null)
+          setAnalysisData(null)
+          setRecommendationTrendData(null)
+          setEarningsCalendarData(null)
+          setTrendingTickersData(null)
+          setInsiderTransactionsData(null)
+          setBalanceSheetData(null)
+          setIncomeStatementDataState(null)
+          setCashFlowDataState(null)
+          setPortfolioHoldingsData(null)
+          setPortfolioAggregationData(null)
+          setPortfolioRiskData(null)
+          setPortfolioBenchmarkData(null)
+          setPortfolioAttributionData(null)
+          setPortfolioRelativePerformanceData(null)
+
+          const newPriceTrendData = apiResponse.data
+          setPortfolioPriceTrendData(newPriceTrendData)
+
+          // Add to history
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "portfolio-price-trend",
+              symbol: "Portfolio",
+              portfolioPriceTrendData: newPriceTrendData,
+            }
+            const updatedHistory = [...prevHistory, newEntry]
+            setCurrentHistoryIndex(updatedHistory.length - 1)
+            return updatedHistory
+          })
+
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150)
+
+          toast({
+            title: "Price Trends",
+            description: `Showing ${apiResponse.data.trends.length} holdings over ${args.timeHistory || 2} years`
           })
         }
       } else if (msg.name === "getCashBalance") {
@@ -1309,8 +1494,32 @@ export default function Home() {
       } else if (msg.name === "placeOrder") {
         // Place buy/sell order
         const userId = args.userId || 1
+        const accountId = args.accountId || 1 // Default to account 1
+
+        // Clear all other content first (mutual exclusivity)
+        setChartData(null)
+        setProfileData(null)
+        setStatisticsData(null)
+        setAnalysisData(null)
+        setRecommendationTrendData(null)
+        setEarningsCalendarData(null)
+        setTrendingTickersData(null)
+        setInsiderTransactionsData(null)
+        setBalanceSheetData(null)
+        setIncomeStatementDataState(null)
+        setCashFlowDataState(null)
+        setPortfolioHoldingsData(null)
+        setPortfolioAggregationData(null)
+        setPortfolioRiskData(null)
+        setPortfolioBenchmarkData(null)
+        setPortfolioRelativePerformanceData(null)
+        setPortfolioAttributionData(null)
+        setPortfolioPriceTrendData(null)
+        // Don't clear orderHistoryData - we want to show it along with preview
+
         apiResponse = await portfolioApi.placeOrder({
           userId,
+          accountId,
           symbol: args.symbol,
           buySell: args.buySell,
           orderType: args.orderType,
@@ -1319,6 +1528,18 @@ export default function Home() {
         })
 
         if (apiResponse.success) {
+          // Save order preview data
+          setOrderPreviewData(apiResponse.data)
+
+          // Also fetch and show order history so both display together
+          const historyResponse = await portfolioApi.fetchOrderHistory(userId)
+          if (historyResponse.success) {
+            setOrderHistoryData(historyResponse.data)
+          }
+
+          // Show components with animation
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150)
+
           toast({
             title: "Order Placed",
             description: apiResponse.data?.message || "Order placed successfully"
@@ -1333,9 +1554,37 @@ export default function Home() {
       } else if (msg.name === "getOrderHistory") {
         // Get order history
         const userId = args.userId || 1
+
+        // Clear all other content first (mutual exclusivity)
+        setChartData(null)
+        setProfileData(null)
+        setStatisticsData(null)
+        setAnalysisData(null)
+        setRecommendationTrendData(null)
+        setEarningsCalendarData(null)
+        setTrendingTickersData(null)
+        setInsiderTransactionsData(null)
+        setBalanceSheetData(null)
+        setIncomeStatementDataState(null)
+        setCashFlowDataState(null)
+        setPortfolioHoldingsData(null)
+        setPortfolioAggregationData(null)
+        setPortfolioRiskData(null)
+        setPortfolioBenchmarkData(null)
+        setPortfolioRelativePerformanceData(null)
+        setPortfolioAttributionData(null)
+        setPortfolioPriceTrendData(null)
+        setOrderPreviewData(null) // Clear order preview when showing history
+
         apiResponse = await portfolioApi.fetchOrderHistory(userId)
 
         if (apiResponse.success) {
+          // Save order history data
+          setOrderHistoryData(apiResponse.data)
+
+          // Show components with animation
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150)
+
           toast({
             title: "Order History",
             description: `Found ${apiResponse.data?.orders.length} orders`
@@ -1358,14 +1607,172 @@ export default function Home() {
             variant: "destructive"
           })
         }
+      } else if (msg.name === "updateOrder") {
+        // Update order
+        apiResponse = await portfolioApi.updateOrder({
+          orderId: args.orderId,
+          qty: args.qty,
+          orderType: args.orderType,
+          limitPrice: args.limitPrice
+        })
+
+        if (apiResponse.success) {
+          toast({
+            title: "Order Updated",
+            description: apiResponse.data?.message || "Order updated successfully"
+          })
+        } else {
+          toast({
+            title: "Update Failed",
+            description: apiResponse.error || "Failed to update order",
+            variant: "destructive"
+          })
+        }
+      } else if (msg.name === "confirmOrder") {
+        // Confirm order - execute the trade
+        const userId = args.userId || 1
+
+        apiResponse = await portfolioApi.confirmOrder({
+          orderId: args.orderId
+        })
+
+        if (apiResponse.success) {
+          // Clear order preview since it's now executed
+          setOrderPreviewData(null)
+
+          // Refresh order history to show updated status
+          const historyResponse = await portfolioApi.fetchOrderHistory(userId)
+          if (historyResponse.success) {
+            setOrderHistoryData(historyResponse.data)
+          }
+
+          // Optionally refresh holdings to show new position
+          const holdingsResponse = await portfolioApi.fetchPortfolioHoldings(userId)
+          if (holdingsResponse.success) {
+            // Store holdings but don't display them yet - keep showing order history
+            // User can navigate to holdings if they want to see them
+          }
+
+          toast({
+            title: "Order Confirmed",
+            description: apiResponse.data?.message || "Order executed successfully"
+          })
+        } else {
+          toast({
+            title: "Confirmation Failed",
+            description: apiResponse.error || "Failed to confirm order",
+            variant: "destructive"
+          })
+        }
+      } else if (msg.name === "rejectOrder") {
+        // Reject order
+        const userId = args.userId || 1
+
+        apiResponse = await portfolioApi.rejectOrder({
+          orderId: args.orderId
+        })
+
+        if (apiResponse.success) {
+          // Clear order preview since it's now rejected
+          setOrderPreviewData(null)
+
+          // Refresh order history to show updated status
+          const historyResponse = await portfolioApi.fetchOrderHistory(userId)
+          if (historyResponse.success) {
+            setOrderHistoryData(historyResponse.data)
+          }
+
+          toast({
+            title: "Order Rejected",
+            description: apiResponse.data?.message || "Order rejected successfully"
+          })
+        } else {
+          toast({
+            title: "Rejection Failed",
+            description: apiResponse.error || "Failed to reject order",
+            variant: "destructive"
+          })
+        }
+      } else if (msg.name === "getAccountList") {
+        // Get list of user accounts
+        const userId = args.userId || 1
+        apiResponse = await portfolioApi.fetchAccountList(userId)
+
+        if (apiResponse.success) {
+          toast({
+            title: "Accounts Retrieved",
+            description: `Found ${apiResponse.data?.accounts.length} account(s)`
+          })
+        }
+      } else if (msg.name === "depositFunds") {
+        // Deposit funds to account
+        const accountId = args.accountId || 1
+        apiResponse = await portfolioApi.depositFunds({
+          accountId,
+          amount: args.amount,
+          description: args.description
+        })
+
+        if (apiResponse.success) {
+          toast({
+            title: "Deposit Successful",
+            description: apiResponse.data?.depositAmount
+              ? `Deposited ${apiResponse.data.depositAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}`
+              : "Funds deposited successfully"
+          })
+        } else {
+          toast({
+            title: "Deposit Failed",
+            description: apiResponse.error || "Failed to deposit funds",
+            variant: "destructive"
+          })
+        }
+      } else if (msg.name === "withdrawFunds") {
+        // Withdraw funds from account
+        const accountId = args.accountId || 1
+        apiResponse = await portfolioApi.withdrawFunds({
+          accountId,
+          amount: args.amount,
+          description: args.description
+        })
+
+        if (apiResponse.success) {
+          toast({
+            title: "Withdrawal Successful",
+            description: apiResponse.data?.withdrawAmount
+              ? `Withdrew ${apiResponse.data.withdrawAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}`
+              : "Funds withdrawn successfully"
+          })
+        } else {
+          toast({
+            title: "Withdrawal Failed",
+            description: apiResponse.error || "Failed to withdraw funds",
+            variant: "destructive"
+          })
+        }
+      } else if (msg.name === "getTransactionHistory") {
+        // Get transaction history
+        const userId = args.userId || 1
+        apiResponse = await portfolioApi.fetchTransactionHistory(
+          userId,
+          args.accountId,
+          args.type
+        )
+
+        if (apiResponse.success) {
+          toast({
+            title: "Transaction History",
+            description: `Found ${apiResponse.data?.transactions.length} transaction(s)`
+          })
+        }
       } else if (msg.name === "authenticateUser") {
         // Voice-based authentication
-        const phone = args.phonenumber
+        const name = args.name
         const dob = args.date_of_birth
 
         try {
           const response = await fetch(
-            `/api/auth/voice-login?phone=${encodeURIComponent(phone)}&dob=${encodeURIComponent(dob)}`
+            `/api/auth/voice-login?name=${encodeURIComponent(name)}&dob=${encodeURIComponent(dob)}`
           )
 
           if (response.ok) {
@@ -1833,8 +2240,10 @@ export default function Home() {
         <div className="flex items-center gap-2">
           {/* User info */}
           {userSession && (
-            <div className="mr-2 text-sm text-muted-foreground">
+            <div className="mr-2 text-sm text-muted-foreground flex items-center gap-2">
               <span className="font-medium">{userSession.data.name}</span>
+              <span className="text-muted-foreground/70">|</span>
+              <span className="text-xs">account number {userSession.data.phone_number}</span>
             </div>
           )}
 
@@ -2182,7 +2591,7 @@ export default function Home() {
             {/* Main Content Card - Shows Chart, Profile, Statistics, Analysis, Trending Tickers, or Financial Statements */}
             <div
               className={`transition-all duration-700 ease-out ${
-                showComponents && (chartData || profileData || statisticsData || analysisData || recommendationTrendData || earningsCalendarData || trendingTickersData || insiderTransactionsData || balanceSheetData || incomeStatementDataState || cashFlowDataState || portfolioHoldingsData || portfolioAggregationData || portfolioRiskData)
+                showComponents && (chartData || profileData || statisticsData || analysisData || recommendationTrendData || earningsCalendarData || trendingTickersData || insiderTransactionsData || balanceSheetData || incomeStatementDataState || cashFlowDataState || portfolioHoldingsData || portfolioAggregationData || portfolioRiskData || portfolioBenchmarkData || portfolioRelativePerformanceData || portfolioAttributionData || portfolioPriceTrendData || orderHistoryData || orderPreviewData)
                   ? "opacity-100 " +
                     (slideDirection === 'left'
                       ? 'animate-slide-in-from-right'
@@ -2410,7 +2819,7 @@ export default function Home() {
               )}
 
               {/* Show Portfolio Holdings */}
-              {portfolioHoldingsData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioAggregationData && !portfolioRiskData && (
+              {portfolioHoldingsData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioAggregationData && !portfolioRiskData && !portfolioBenchmarkData && !portfolioAttributionData && !portfolioRelativePerformanceData && !portfolioPriceTrendData && (
                 <Card className="border-border">
                   <CardContent className="p-6">
                     <HoldingsTable
@@ -2423,8 +2832,192 @@ export default function Home() {
                 </Card>
               )}
 
+              {/* Show Portfolio Benchmark */}
+              {portfolioBenchmarkData && portfolioBenchmarkData.chartData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioAggregationData && !portfolioRiskData && !portfolioAttributionData && !portfolioRelativePerformanceData && !portfolioPriceTrendData && (
+                <BenchmarkChart
+                  data={portfolioBenchmarkData.chartData}
+                  benchmarkName={portfolioBenchmarkData.comparison[0]?.benchmarkValue ? "Benchmark" : "SPX"}
+                  title="Portfolio vs Benchmark"
+                  subtitle="Historical performance comparison"
+                />
+              )}
+
+              {/* Show Portfolio Returns Attribution */}
+              {portfolioAttributionData && portfolioAttributionData.chartData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioAggregationData && !portfolioRiskData && !portfolioBenchmarkData && !portfolioRelativePerformanceData && !portfolioPriceTrendData && (
+                <WaterfallChart
+                  data={portfolioAttributionData.chartData}
+                  title="Returns Attribution"
+                  subtitle="Contribution by category"
+                />
+              )}
+
+              {/* Show Portfolio Relative Performance */}
+              {portfolioRelativePerformanceData && portfolioRelativePerformanceData.performance && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioAggregationData && !portfolioRiskData && !portfolioBenchmarkData && !portfolioAttributionData && !portfolioPriceTrendData && (
+                <Card className="border-border">
+                  <CardContent className="p-6">
+                    <h3 className="text-lg font-semibold mb-4">Relative Performance</h3>
+                    <div className="space-y-2">
+                      {portfolioRelativePerformanceData.performance.map((item: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <p className="font-medium">{item.assetName}</p>
+                            <p className="text-sm text-muted-foreground">vs {item.relativeBenchmark}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className={`font-semibold ${item.outperformance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {item.outperformance >= 0 ? '+' : ''}{item.outperformance.toFixed(2)}%
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {item.portfolioReturn.toFixed(2)}% vs {item.benchmarkReturn.toFixed(2)}%
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Show Portfolio Price Trends */}
+              {portfolioPriceTrendData && portfolioPriceTrendData.chartData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioAggregationData && !portfolioRiskData && !portfolioBenchmarkData && !portfolioAttributionData && !portfolioRelativePerformanceData && (
+                <PriceTrendChart
+                  data={portfolioPriceTrendData.chartData}
+                  title="Price Trends"
+                  subtitle="Historical price performance"
+                  timeHistory={portfolioPriceTrendData.trends[0]?.priceHistory.length > 500 ? 5 : 2}
+                />
+              )}
+
+              {/* Show Orders Section - Preview + History Together */}
+              {(orderPreviewData || orderHistoryData) && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioAggregationData && !portfolioRiskData && !portfolioBenchmarkData && !portfolioAttributionData && !portfolioRelativePerformanceData && !portfolioPriceTrendData && (
+                <div className="space-y-4">
+                  {/* Order Preview Card - Show if exists */}
+                  {orderPreviewData && orderPreviewData.orderPreview && (
+                    <Card className="border-border">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <div className="flex items-center gap-2">
+                            <span>Order Preview - Pending Confirmation</span>
+                            <Badge variant="outline" style={{ color: "#FF9800" }}>Pending</Badge>
+                          </div>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        {/* Order Details */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Order ID</p>
+                            <p className="text-lg font-semibold">#{orderPreviewData.orderPreview.orderId}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Symbol</p>
+                            <p className="text-lg font-semibold">{orderPreviewData.orderPreview.symbol}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Action</p>
+                            <Badge variant={orderPreviewData.orderPreview.buySell === "Buy" ? "default" : "destructive"}>
+                              {orderPreviewData.orderPreview.buySell}
+                            </Badge>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Quantity</p>
+                            <p className="text-lg font-semibold">{orderPreviewData.orderPreview.quantity} shares</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Estimated Price</p>
+                            <p className="text-lg font-semibold">
+                              {new Intl.NumberFormat("en-US", {
+                                style: "currency",
+                                currency: "USD",
+                                minimumFractionDigits: 2,
+                              }).format(orderPreviewData.orderPreview.estimatedPrice)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Estimated Total</p>
+                            <p className="text-lg font-semibold">
+                              {new Intl.NumberFormat("en-US", {
+                                style: "currency",
+                                currency: "USD",
+                                minimumFractionDigits: 2,
+                              }).format(orderPreviewData.orderPreview.estimatedTotal)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Account Balance Info */}
+                        <div className="border-t pt-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-sm text-muted-foreground">Account</p>
+                              <p className="text-base font-medium">{orderPreviewData.orderPreview.accountName}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-muted-foreground">Current Balance</p>
+                              <p className="text-base font-medium">
+                                {new Intl.NumberFormat("en-US", {
+                                  style: "currency",
+                                  currency: "USD",
+                                  minimumFractionDigits: 2,
+                                }).format(orderPreviewData.orderPreview.accountBalance)}
+                              </p>
+                            </div>
+                            <div className="col-span-2">
+                              <p className="text-sm text-muted-foreground">Balance After Trade</p>
+                              <p className="text-xl font-bold">
+                                {new Intl.NumberFormat("en-US", {
+                                  style: "currency",
+                                  currency: "USD",
+                                  minimumFractionDigits: 2,
+                                }).format(orderPreviewData.orderPreview.balanceAfterTrade)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Instructions */}
+                        <div className="bg-muted/50 p-4 rounded-lg">
+                          <p className="text-sm text-muted-foreground">
+                            This order is pending confirmation. Say &quot;confirm order {orderPreviewData.orderPreview.orderId}&quot; to execute it,
+                            or &quot;reject order {orderPreviewData.orderPreview.orderId}&quot; to cancel.
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Order History Table - Always show when in orders view */}
+                  {orderHistoryData && orderHistoryData.orders && (
+                    <OrderHistoryTable
+                      orders={orderHistoryData.orders}
+                      userId={1}
+                      onOrderCancelled={() => {
+                        // Refresh order history after cancellation
+                        const refreshOrders = async () => {
+                          const response = await portfolioApi.fetchOrderHistory(1)
+                          if (response.success) {
+                            setOrderHistoryData(response.data)
+                          }
+                        }
+                        refreshOrders()
+                      }}
+                      onOrderUpdated={() => {
+                        // Refresh order history after update/confirmation
+                        const refreshOrders = async () => {
+                          const response = await portfolioApi.fetchOrderHistory(1)
+                          if (response.success) {
+                            setOrderHistoryData(response.data)
+                          }
+                        }
+                        refreshOrders()
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+
               {/* Show loading or empty state */}
-              {!chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioAggregationData && !portfolioRiskData && (
+              {!chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioAggregationData && !portfolioRiskData && !portfolioBenchmarkData && !portfolioAttributionData && !portfolioRelativePerformanceData && !portfolioPriceTrendData && !orderHistoryData && !orderPreviewData && (
                 <Card className="border-border">
                   <CardContent className="p-6">
                     {isLoading ? (

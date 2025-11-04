@@ -254,6 +254,10 @@ export const voiceAssistantTools = [
           type: "string",
           description: "Dimension to attribute returns by: 'asset_class', 'sector', or 'ticker'"
         },
+        period: {
+          type: "string",
+          description: "Time period: '1m', '3m', '6m', '1y', '2y', '3y', or '5y' (default: '1y')"
+        },
       },
       required: ["dimension"],
     },
@@ -334,14 +338,14 @@ export const voiceAssistantTools = [
       type: "object",
       properties: {
         userId: { type: "number", description: "User ID (default: 1)" },
-        accountId: { type: "number", description: "Account ID to trade from (required)" },
+        accountId: { type: "number", description: "Account ID to trade from (default: 1 if user has only one account)" },
         symbol: { type: "string", description: "Stock symbol to trade (e.g., AAPL, MSFT)" },
         buySell: { type: "string", description: "'Buy' or 'Sell'" },
         orderType: { type: "string", description: "'Market Open' or 'Limit'" },
         qty: { type: "number", description: "Quantity of shares to trade" },
         price: { type: "number", description: "Limit price (required for Limit orders, optional for Market Open)" },
       },
-      required: ["accountId", "symbol", "buySell", "orderType", "qty"],
+      required: ["symbol", "buySell", "orderType", "qty"],
     },
   },
   {
@@ -364,6 +368,21 @@ export const voiceAssistantTools = [
       type: "object",
       properties: {
         orderId: { type: "number", description: "Order ID to reject (from placeOrder response)" },
+      },
+      required: ["orderId"],
+    },
+  },
+  {
+    type: "function",
+    name: "updateOrder",
+    description: "Updates a pending order's parameters before confirmation. Can modify quantity, order type (Market Open vs Limit), and limit price. Useful when user wants to change their order details after placing it but before confirming. Only works on orders with 'Placed' or 'Under Review' status. Cannot update executed or cancelled orders.",
+    parameters: {
+      type: "object",
+      properties: {
+        orderId: { type: "number", description: "Order ID to update" },
+        qty: { type: "number", description: "Optional: new quantity of shares" },
+        orderType: { type: "string", description: "Optional: order type ('Market Open' or 'Limit')" },
+        limitPrice: { type: "number", description: "Optional: limit price for Limit orders only" },
       },
       required: ["orderId"],
     },
@@ -409,6 +428,27 @@ export const voiceAssistantTools = [
   },
   {
     type: "function",
+    name: "getPriceTrend",
+    description: "Shows historical price trends for portfolio holdings over time. Displays percentage change from start date for easy comparison. Useful for analyzing how individual holdings have performed over various time periods.",
+    parameters: {
+      type: "object",
+      properties: {
+        userId: { type: "number", description: "User ID (default: 1)" },
+        tickers: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional: array of ticker symbols to analyze. If not provided, shows all portfolio holdings."
+        },
+        timeHistory: {
+          type: "number",
+          description: "Years of history to fetch (e.g., 1, 2, 3, 5). Default: 2 years."
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    type: "function",
     name: "muteAssistant",
     description: "Allows the assistant to end the current conversation",
     parameters: {
@@ -422,20 +462,20 @@ export const voiceAssistantTools = [
   {
     type: "function",
     name: "authenticateUser",
-    description: "Authenticate user via phone number and date of birth for voice-based login. Use this when user wants to log in or access their portfolio.",
+    description: "Authenticate user via full name and date of birth for voice-based login. Use this when user wants to log in or access their portfolio. Natural examples: 'My name is John Doe and my birthday is January 1st, 1990' or 'I'm Jane Smith, born on March 15th, 1985'.",
     parameters: {
       type: "object",
       properties: {
-        phonenumber: {
+        name: {
           type: "string",
-          description: "User's 11-digit phone number (e.g., 12345678901)",
+          description: "User's full name exactly as registered (e.g., 'John Doe', 'Jane Smith'). Case-sensitive match.",
         },
         date_of_birth: {
           type: "string",
-          description: "User's date of birth in YYYY-MM-DD format (e.g., 1990-01-01)",
+          description: "User's date of birth in YYYY-MM-DD format (e.g., 1990-01-01). Parse from natural language if needed (e.g., 'January 1st, 1990' → '1990-01-01').",
         },
       },
-      required: ["phonenumber", "date_of_birth"],
+      required: ["name", "date_of_birth"],
     },
   },
 ];

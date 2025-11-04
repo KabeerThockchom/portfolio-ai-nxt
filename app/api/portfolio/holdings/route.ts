@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db/connection"
-import { userPortfolio, assetType, assetHistory } from "@/lib/db/schema"
-import { eq, and, desc } from "drizzle-orm"
+import { userPortfolio, assetType } from "@/lib/db/schema"
+import { eq } from "drizzle-orm"
 import type { PortfolioHolding, PortfolioHoldingsResponse } from "@/types/portfolio"
 
 export async function GET(request: Request) {
@@ -38,15 +38,30 @@ export async function GET(request: Request) {
           } as PortfolioHolding
         }
 
-        // Get latest price from asset_history
-        const latestPriceRecord = await db
-          .select()
-          .from(assetHistory)
-          .where(eq(assetHistory.assetId, asset_type.assetId))
-          .orderBy(desc(assetHistory.date))
-          .limit(1)
+        // Get latest real-time price from Yahoo Finance API
+        let latestClosePrice = 0
+        try {
+          const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+          const quoteResponse = await fetch(`${baseUrl}/api/stock/quote?symbol=${asset_type.assetTicker}`)
 
-        const latestClosePrice = latestPriceRecord[0]?.closePrice || 0
+          // Check if response is OK before parsing
+          if (!quoteResponse.ok) {
+            console.warn(`Quote API returned ${quoteResponse.status} for ${asset_type.assetTicker}`)
+            latestClosePrice = 0
+          } else {
+            const quoteData = await quoteResponse.json()
+
+            if (quoteData.success && quoteData.data?.price) {
+              latestClosePrice = quoteData.data.price
+            } else {
+              console.warn(`Failed to fetch real-time price for ${asset_type.assetTicker}: ${quoteData.error || 'Unknown error'}`)
+              latestClosePrice = 0
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching real-time price for ${asset_type.assetTicker}:`, error)
+          latestClosePrice = 0
+        }
         const currentAmount = user_portfolio.assetTotalUnits * latestClosePrice
         const gainLoss = currentAmount - user_portfolio.investmentAmount
         const gainLossPercent =

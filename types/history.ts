@@ -14,7 +14,14 @@ export type HistoryContentType =
   | "insider-transactions"
   | "balance-sheet"
   | "income-statement"
-  | "cash-flow";
+  | "cash-flow"
+  | "portfolio-holdings"
+  | "portfolio-aggregation"
+  | "portfolio-risk"
+  | "portfolio-benchmark"
+  | "portfolio-attribution"
+  | "portfolio-relative-performance"
+  | "portfolio-price-trend";
 
 // Interface for history items - supports chart, profile, and statistics
 export interface HistoryItem {
@@ -48,6 +55,14 @@ export interface HistoryItem {
   balanceSheetData?: any;
   incomeStatementData?: any;
   cashFlowData?: any;
+  // Portfolio-specific data
+  portfolioHoldingsData?: any;
+  portfolioAggregationData?: any;
+  portfolioRiskData?: any;
+  portfolioBenchmarkData?: any;
+  portfolioAttributionData?: any;
+  portfolioRelativePerformanceData?: any;
+  portfolioPriceTrendData?: any;
 }
 
 export type SlideDirection = 'none' | 'left' | 'right';
