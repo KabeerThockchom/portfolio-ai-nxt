@@ -9,59 +9,40 @@ export interface HistoricalPrice {
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 
-// Rate limiting: 10 requests per second = 1 request every 100ms
-const RATE_LIMIT_DELAY_MS = 100
-let lastRequestTime = 0
-let requestQueue: Array<() => Promise<void>> = []
-let isProcessingQueue = false
+// Rate limiting: 10 requests per second
+// Use a sliding window to track requests in the last second
+const MAX_REQUESTS_PER_SECOND = 10
+const requestTimestamps: number[] = []
 
 /**
- * Rate limiter for API requests (10 req/sec max)
+ * Rate limiter for API requests (10 req/sec max) using sliding window
  */
 async function rateLimitedFetch<T>(fetchFn: () => Promise<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const executeRequest = async () => {
-      try {
-        const now = Date.now()
-        const timeSinceLastRequest = now - lastRequestTime
+  const now = Date.now()
 
-        if (timeSinceLastRequest < RATE_LIMIT_DELAY_MS) {
-          // Wait until we can make the next request
-          await new Promise(r => setTimeout(r, RATE_LIMIT_DELAY_MS - timeSinceLastRequest))
-        }
+  // Remove timestamps older than 1 second
+  while (requestTimestamps.length > 0 && requestTimestamps[0] < now - 1000) {
+    requestTimestamps.shift()
+  }
 
-        lastRequestTime = Date.now()
-        const result = await fetchFn()
-        resolve(result)
-      } catch (error) {
-        reject(error)
-      }
-    }
+  // If we've hit the limit, wait until we can make another request
+  if (requestTimestamps.length >= MAX_REQUESTS_PER_SECOND) {
+    const oldestTimestamp = requestTimestamps[0]
+    const waitTime = 1000 - (now - oldestTimestamp) + 10 // Add 10ms buffer
+    await new Promise(resolve => setTimeout(resolve, waitTime))
 
-    requestQueue.push(executeRequest)
-
-    if (!isProcessingQueue) {
-      processQueue()
-    }
-  })
-}
-
-/**
- * Process queued requests sequentially with rate limiting
- */
-async function processQueue() {
-  if (isProcessingQueue) return
-
-  isProcessingQueue = true
-
-  while (requestQueue.length > 0) {
-    const request = requestQueue.shift()
-    if (request) {
-      await request()
+    // Clean up old timestamps again after waiting
+    const newNow = Date.now()
+    while (requestTimestamps.length > 0 && requestTimestamps[0] < newNow - 1000) {
+      requestTimestamps.shift()
     }
   }
 
-  isProcessingQueue = false
+  // Record this request
+  requestTimestamps.push(Date.now())
+
+  // Execute the fetch
+  return await fetchFn()
 }
 
 /**

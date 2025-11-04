@@ -210,16 +210,24 @@ export async function POST(request: Request) {
         // Aggregate by sector within this asset class
         const sectorMap = new Map<string, PortfolioAggregation>()
 
+        console.log(`[MultiLevel] Processing ${assetClassAgg.label}: ${assetClassHoldings.length} holdings`)
+
         for (const holding of assetClassHoldings) {
+          console.log(`  Fetching sectors for ${holding.asset?.assetTicker} (assetId=${holding.asset?.assetId})`)
+
           const sectors = await db
             .select()
             .from(assetSector)
             .where(eq(assetSector.assetId, holding.asset?.assetId || 0))
 
+          console.log(`  Found ${sectors.length} sectors:`, sectors.map(s => `${s.sectorName} (${s.sectorWeightage}%)`))
+
           for (const sector of sectors) {
             const sectorKey = sector.sectorName
             const weightedValue =
               (holding.currentAmount || 0) * (sector.sectorWeightage / 100)
+
+            console.log(`    ${sectorKey}: $${weightedValue.toFixed(2)}`)
 
             if (sectorMap.has(sectorKey)) {
               const existing = sectorMap.get(sectorKey)!
@@ -234,6 +242,8 @@ export async function POST(request: Request) {
             }
           }
         }
+
+        console.log(`[MultiLevel] ${assetClassAgg.label} has ${sectorMap.size} sectors`)
 
         multiLevelAgg.push({
           ...assetClassAgg,

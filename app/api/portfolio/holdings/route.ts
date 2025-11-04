@@ -92,7 +92,7 @@ export async function GET(request: Request) {
           gainLossPercent,
         } as PortfolioHolding
       },
-      8, // Process 8 items in parallel per batch
+      10, // Process 10 items in parallel per batch (max API limit)
       1000 // Wait 1 second between batches
     )
 
