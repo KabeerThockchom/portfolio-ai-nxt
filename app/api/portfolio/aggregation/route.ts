@@ -70,6 +70,7 @@ export async function POST(request: Request) {
       .leftJoin(assetType, eq(userPortfolio.assetId, assetType.assetId))
 
     // Enrich with latest prices
+    console.log(`[Aggregation] Enriching ${holdings.length} holdings with prices...`)
     const enrichedHoldings = await Promise.all(
       holdings.map(async ({ user_portfolio, asset_type }) => {
         if (!asset_type) return null
@@ -82,6 +83,8 @@ export async function POST(request: Request) {
           user_portfolio.investmentAmount > 0
             ? (gainLoss / user_portfolio.investmentAmount) * 100
             : 0
+
+        console.log(`  ${asset_type.assetTicker}: price=$${latestClosePrice}, units=${user_portfolio.assetTotalUnits}, currentAmount=$${currentAmount}`)
 
         return {
           ...user_portfolio,
@@ -118,10 +121,14 @@ export async function POST(request: Request) {
           break
         case "sector":
           // For sectors, we need to fetch sector breakdown
+          console.log(`Processing ${holding.asset?.assetTicker}: currentAmount=$${holding.currentAmount}, asset_id=${holding.asset?.assetId}`)
+
           const sectors = await db
             .select()
             .from(assetSector)
             .where(eq(assetSector.assetId, holding.asset?.assetId || 0))
+
+          console.log(`  Found ${sectors.length} sectors for ${holding.asset?.assetTicker}`)
 
           // Distribute holding value across sectors based on weightage
           for (const sector of sectors) {
@@ -130,6 +137,8 @@ export async function POST(request: Request) {
               (holding.currentAmount || 0) * (sector.sectorWeightage / 100)
             const weightedReturn =
               (holding.gainLossPercent || 0) * (sector.sectorWeightage / 100)
+
+            console.log(`    ${sectorKey}: ${sector.sectorWeightage}% = $${weightedValue.toFixed(2)}`)
 
             if (aggregationMap.has(sectorKey)) {
               const existing = aggregationMap.get(sectorKey)!

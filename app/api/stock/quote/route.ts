@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server"
 
 export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const symbol = searchParams.get("symbol") || "unknown"
+
   try {
-    const { searchParams } = new URL(request.url)
-    const symbol = searchParams.get("symbol")
     const region = searchParams.get("region") || "US"
 
-    if (!symbol) {
+    if (!searchParams.get("symbol")) {
       return NextResponse.json(
         { success: false, error: "Symbol parameter is required" },
         { status: 400 }
@@ -36,7 +37,6 @@ export async function GET(request: Request) {
 
     // Fetch current stock price from Yahoo Finance using get-quotes endpoint
     const url = `https://yahoo-finance-real-time1.p.rapidapi.com/market/get-quotes?region=${region}&symbols=${symbol}`
-    console.log(`Fetching quote for ${symbol} from: ${url}`)
 
     const response = await fetch(url, {
       method: "GET",
@@ -56,13 +56,31 @@ export async function GET(request: Request) {
     }
 
     const data = await response.json()
-    console.log(`Quote data for ${symbol}:`, JSON.stringify(data).substring(0, 200))
 
-    // Extract regular market price from quoteResponse
+    // Check for API error response
+    if (data.quoteResponse?.error) {
+      console.error(`Yahoo Finance API error for ${symbol}:`, data.quoteResponse.error)
+      return NextResponse.json(
+        { success: false, error: data.quoteResponse.error.description || "API error" },
+        { status: 400 }
+      )
+    }
+
+    // Extract quote data from quoteResponse
     const quote = data?.quoteResponse?.result?.[0]
-    const price = quote?.regularMarketPrice
+
+    if (!quote) {
+      console.error(`No quote data returned for ${symbol}`)
+      return NextResponse.json(
+        { success: false, error: `No data available for ${symbol}` },
+        { status: 404 }
+      )
+    }
+
+    const price = quote.regularMarketPrice
 
     if (!price) {
+      console.error(`No valid price found for ${symbol}`)
       return NextResponse.json(
         { success: false, error: `Could not fetch price for ${symbol}` },
         { status: 404 }
@@ -72,7 +90,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       data: {
-        symbol: quote.symbol,
+        symbol: quote.symbol || symbol,
         price: price,
         currency: quote.currency || "USD",
         shortName: quote.shortName || symbol,
@@ -80,11 +98,13 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    console.error("Error fetching stock quote:", error)
+    console.error(`Error fetching stock quote for ${searchParams.get("symbol")}:`, error)
+    const errorMessage = error instanceof Error ? error.message : "Failed to fetch stock quote"
+    console.error(`Error details: ${errorMessage}`)
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to fetch stock quote",
+        error: errorMessage,
       },
       { status: 500 }
     )

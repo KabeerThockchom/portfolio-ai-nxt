@@ -9,6 +9,61 @@ export interface HistoricalPrice {
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 
+// Rate limiting: 10 requests per second = 1 request every 100ms
+const RATE_LIMIT_DELAY_MS = 100
+let lastRequestTime = 0
+let requestQueue: Array<() => Promise<void>> = []
+let isProcessingQueue = false
+
+/**
+ * Rate limiter for API requests (10 req/sec max)
+ */
+async function rateLimitedFetch<T>(fetchFn: () => Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const executeRequest = async () => {
+      try {
+        const now = Date.now()
+        const timeSinceLastRequest = now - lastRequestTime
+
+        if (timeSinceLastRequest < RATE_LIMIT_DELAY_MS) {
+          // Wait until we can make the next request
+          await new Promise(r => setTimeout(r, RATE_LIMIT_DELAY_MS - timeSinceLastRequest))
+        }
+
+        lastRequestTime = Date.now()
+        const result = await fetchFn()
+        resolve(result)
+      } catch (error) {
+        reject(error)
+      }
+    }
+
+    requestQueue.push(executeRequest)
+
+    if (!isProcessingQueue) {
+      processQueue()
+    }
+  })
+}
+
+/**
+ * Process queued requests sequentially with rate limiting
+ */
+async function processQueue() {
+  if (isProcessingQueue) return
+
+  isProcessingQueue = true
+
+  while (requestQueue.length > 0) {
+    const request = requestQueue.shift()
+    if (request) {
+      await request()
+    }
+  }
+
+  isProcessingQueue = false
+}
+
 /**
  * Get historical prices for a symbol with automatic caching
  * @param symbol Stock ticker symbol
@@ -53,7 +108,7 @@ export async function getHistoricalPrices(
 }
 
 /**
- * Get current price for a symbol (real-time, no caching)
+ * Get current price for a symbol (real-time, with rate limiting)
  * @param symbol Stock ticker symbol
  * @returns Current price
  */
@@ -64,22 +119,25 @@ export async function getCurrentPrice(symbol: string): Promise<number> {
       return 1.0
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
-    const quoteResponse = await fetch(`${baseUrl}/api/stock/quote?symbol=${symbol}`)
+    // Use rate limiter to ensure we don't exceed 10 req/sec
+    return await rateLimitedFetch(async () => {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+      const quoteResponse = await fetch(`${baseUrl}/api/stock/quote?symbol=${symbol}`)
 
-    if (!quoteResponse.ok) {
-      console.warn(`Quote API returned ${quoteResponse.status} for ${symbol}`)
-      return 0
-    }
+      if (!quoteResponse.ok) {
+        console.warn(`Quote API returned ${quoteResponse.status} for ${symbol}`)
+        return 0
+      }
 
-    const quoteData = await quoteResponse.json()
+      const quoteData = await quoteResponse.json()
 
-    if (quoteData.success && quoteData.data?.price) {
-      return quoteData.data.price
-    } else {
-      console.warn(`Failed to fetch real-time price for ${symbol}: ${quoteData.error || 'Unknown error'}`)
-      return 0
-    }
+      if (quoteData.success && quoteData.data?.price) {
+        return quoteData.data.price
+      } else {
+        console.warn(`Failed to fetch real-time price for ${symbol}: ${quoteData.error || 'Unknown error'}`)
+        return 0
+      }
+    })
   } catch (error) {
     console.error(`Error fetching current price for ${symbol}:`, error)
     return 0
@@ -123,7 +181,7 @@ function isCacheFresh(cachedPrices: Array<{ cachedAt: string }>): boolean {
 }
 
 /**
- * Fetch historical prices from Yahoo Finance API
+ * Fetch historical prices from Yahoo Finance API with rate limiting
  */
 async function fetchHistoricalPricesFromAPI(
   symbol: string,
@@ -131,46 +189,49 @@ async function fetchHistoricalPricesFromAPI(
   endDate: string
 ): Promise<HistoricalPrice[]> {
   try {
-    // Convert ISO dates to Unix timestamps
-    const period1 = Math.floor(new Date(startDate).getTime() / 1000)
-    const period2 = Math.floor(new Date(endDate).getTime() / 1000)
+    // Use rate limiter to ensure we don't exceed 10 req/sec
+    return await rateLimitedFetch(async () => {
+      // Convert ISO dates to Unix timestamps
+      const period1 = Math.floor(new Date(startDate).getTime() / 1000)
+      const period2 = Math.floor(new Date(endDate).getTime() / 1000)
 
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
-    const url = `${baseUrl}/api/stock/chart?symbol=${symbol}&region=US&range=max&interval=1d&period1=${period1}&period2=${period2}`
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+      const url = `${baseUrl}/api/stock/chart?symbol=${symbol}&region=US&range=max&interval=1d&period1=${period1}&period2=${period2}`
 
-    console.log(`Fetching historical prices from: ${url}`)
+      console.log(`Fetching historical prices from: ${url}`)
 
-    const response = await fetch(url)
+      const response = await fetch(url)
 
-    if (!response.ok) {
-      console.error(`Chart API returned ${response.status} for ${symbol}`)
-      return []
-    }
-
-    const data = await response.json()
-
-    if (!data.success || !data.data?.chart?.result?.[0]) {
-      console.error(`No chart data available for ${symbol}`)
-      return []
-    }
-
-    const result = data.data.chart.result[0]
-    const timestamps = result.timestamp || []
-    const closes = result.indicators?.quote?.[0]?.close || []
-
-    // Convert to HistoricalPrice format
-    const prices: HistoricalPrice[] = []
-    for (let i = 0; i < timestamps.length; i++) {
-      if (closes[i] != null) {
-        const date = new Date(timestamps[i] * 1000).toISOString().split('T')[0]
-        prices.push({
-          date,
-          closePrice: closes[i]
-        })
+      if (!response.ok) {
+        console.error(`Chart API returned ${response.status} for ${symbol}`)
+        return []
       }
-    }
 
-    return prices
+      const data = await response.json()
+
+      if (!data.success || !data.data?.chart?.result?.[0]) {
+        console.error(`No chart data available for ${symbol}`)
+        return []
+      }
+
+      const result = data.data.chart.result[0]
+      const timestamps = result.timestamp || []
+      const closes = result.indicators?.quote?.[0]?.close || []
+
+      // Convert to HistoricalPrice format
+      const prices: HistoricalPrice[] = []
+      for (let i = 0; i < timestamps.length; i++) {
+        if (closes[i] != null) {
+          const date = new Date(timestamps[i] * 1000).toISOString().split('T')[0]
+          prices.push({
+            date,
+            closePrice: closes[i]
+          })
+        }
+      }
+
+      return prices
+    })
   } catch (error) {
     console.error(`Error fetching historical prices from API for ${symbol}:`, error)
     return []
