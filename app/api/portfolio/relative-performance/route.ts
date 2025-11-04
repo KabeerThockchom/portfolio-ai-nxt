@@ -4,40 +4,30 @@ import {
   userPortfolio,
   assetType,
   relativeBenchmarks,
-  assetHistory,
 } from "@/lib/db/schema"
-import { eq, and, desc, lte } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import type {
   RelativePerformanceRequest,
   RelativePerformanceResponse,
 } from "@/types/portfolio"
+import { getHistoricalPrices } from "@/lib/services/price-service"
 
-// Helper to get price at a specific date or closest before
-async function getPriceAtDate(
-  assetTicker: string,
+// Helper to get price at a specific date or closest before from price array
+function getPriceAtDate(
+  prices: Array<{ date: string; closePrice: number }>,
   targetDate: Date
-): Promise<number | null> {
-  const asset = await db
-    .select()
-    .from(assetType)
-    .where(eq(assetType.assetTicker, assetTicker))
-    .limit(1)
+): number | null {
+  const targetDateStr = targetDate.toISOString().split("T")[0]
 
-  if (asset.length === 0) return null
+  // Filter prices on or before target date
+  const validPrices = prices.filter(p => p.date <= targetDateStr)
 
-  const prices = await db
-    .select()
-    .from(assetHistory)
-    .where(
-      and(
-        eq(assetHistory.assetId, asset[0].assetId),
-        lte(assetHistory.date, targetDate.toISOString().split("T")[0])
-      )
-    )
-    .orderBy(desc(assetHistory.date))
-    .limit(1)
+  if (validPrices.length === 0) {
+    return null
+  }
 
-  return prices[0]?.closePrice || null
+  // Return the closest (most recent) price
+  return validPrices[validPrices.length - 1].closePrice
 }
 
 // Helper to calculate date range based on period
@@ -98,10 +88,18 @@ export async function POST(request: Request) {
       .where(eq(userPortfolio.userId, userId))
       .leftJoin(assetType, eq(userPortfolio.assetId, assetType.assetId))
 
-    // Calculate returns for each holding
-    const performance = await Promise.all(
-      holdings.map(async ({ user_portfolio, asset_type }) => {
-        if (!asset_type) return null
+    // Fetch historical prices for all holdings and benchmarks upfront (with caching)
+    const startDateStr = startDate.toISOString().split("T")[0]
+    const endDateStr = endDate.toISOString().split("T")[0]
+
+    // Create price map: symbol -> prices array
+    const priceMap = new Map<string, Array<{ date: string; closePrice: number }>>()
+
+    // Get benchmark mapping for each holding
+    const benchmarkMap = new Map<string, string>()
+    await Promise.all(
+      holdings.map(async ({ asset_type }) => {
+        if (!asset_type) return
 
         // Find relative benchmark
         const benchmarks = await db
@@ -113,13 +111,54 @@ export async function POST(request: Request) {
         const relativeBenchmark =
           benchmarks.length > 0 ? benchmarks[0].relativeBenchmark : "SPX"
 
+        benchmarkMap.set(asset_type.assetTicker, relativeBenchmark)
+      })
+    )
+
+    // Fetch prices for all holdings
+    await Promise.all(
+      holdings.map(async ({ asset_type }) => {
+        if (!asset_type) return
+
+        const prices = await getHistoricalPrices(
+          asset_type.assetTicker,
+          startDateStr,
+          endDateStr
+        )
+        priceMap.set(asset_type.assetTicker, prices)
+      })
+    )
+
+    // Fetch prices for all unique benchmarks
+    const uniqueBenchmarks = Array.from(new Set(benchmarkMap.values()))
+    await Promise.all(
+      uniqueBenchmarks.map(async (benchmark) => {
+        const prices = await getHistoricalPrices(
+          benchmark,
+          startDateStr,
+          endDateStr
+        )
+        priceMap.set(benchmark, prices)
+      })
+    )
+
+    // Calculate returns for each holding
+    const performance = holdings.map(({ user_portfolio, asset_type }) => {
+        if (!asset_type) return null
+
+        const relativeBenchmark = benchmarkMap.get(asset_type.assetTicker) || "SPX"
+
+        // Get prices from map
+        const holdingPrices = priceMap.get(asset_type.assetTicker) || []
+        const benchmarkPrices = priceMap.get(relativeBenchmark) || []
+
         // Get historical prices for the holding
-        const startPrice = await getPriceAtDate(asset_type.assetTicker, startDate)
-        const endPrice = await getPriceAtDate(asset_type.assetTicker, endDate)
+        const startPrice = getPriceAtDate(holdingPrices, startDate)
+        const endPrice = getPriceAtDate(holdingPrices, endDate)
 
         // Get historical prices for the benchmark
-        const benchmarkStartPrice = await getPriceAtDate(relativeBenchmark, startDate)
-        const benchmarkEndPrice = await getPriceAtDate(relativeBenchmark, endDate)
+        const benchmarkStartPrice = getPriceAtDate(benchmarkPrices, startDate)
+        const benchmarkEndPrice = getPriceAtDate(benchmarkPrices, endDate)
 
         // Calculate returns
         const portfolioReturn =
@@ -144,7 +183,6 @@ export async function POST(request: Request) {
           outperformance: Math.round(outperformance * 100) / 100,
         }
       })
-    )
 
     const validPerformance = performance.filter((p) => p !== null)
 

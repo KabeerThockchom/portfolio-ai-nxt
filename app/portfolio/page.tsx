@@ -145,6 +145,26 @@ export default function PortfolioPage() {
     }
   }
 
+  const loadSectorAggregation = async () => {
+    portfolioAnalysis.setIsLoadingSector(true)
+
+    try {
+      const result = await portfolioApi.fetchPortfolioAggregation({
+        userId,
+        dimension: "sector",
+        metric: "total_value",
+      })
+
+      if (result.success && result.data) {
+        portfolioAnalysis.setSectorChartData(result.data.chartData)
+      }
+    } catch (error) {
+      console.error("Error loading sector aggregation:", error)
+    } finally {
+      portfolioAnalysis.setIsLoadingSector(false)
+    }
+  }
+
   const loadRiskAnalysis = async () => {
     portfolioAnalysis.setIsLoadingRisk(true)
 
@@ -431,8 +451,9 @@ export default function PortfolioPage() {
                 variant="outline"
                 size="sm"
                 className="mb-2"
+                disabled={portfolioAnalysis.isLoadingAggregation}
               >
-                Load Asset Class Distribution
+                {portfolioAnalysis.isLoadingAggregation ? "Loading..." : "Load Asset Class Distribution"}
               </Button>
               {portfolioAnalysis.aggregationChartData && (
                 <DonutChart
@@ -443,6 +464,28 @@ export default function PortfolioPage() {
               )}
             </div>
 
+            {/* Sector Distribution */}
+            <div>
+              <Button
+                onClick={loadSectorAggregation}
+                variant="outline"
+                size="sm"
+                className="mb-2"
+                disabled={portfolioAnalysis.isLoadingSector}
+              >
+                {portfolioAnalysis.isLoadingSector ? "Loading..." : "Load Sector Distribution"}
+              </Button>
+              {portfolioAnalysis.sectorChartData && (
+                <DonutChart
+                  data={portfolioAnalysis.sectorChartData}
+                  title="Portfolio by Sector"
+                  subtitle="Breakdown across market sectors"
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 mt-4">
             {/* Risk Score Gauge */}
             <div>
               <Button

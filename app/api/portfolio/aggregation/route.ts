@@ -3,16 +3,16 @@ import { db } from "@/lib/db/connection"
 import {
   userPortfolio,
   assetType,
-  assetHistory,
   assetSector,
 } from "@/lib/db/schema"
-import { eq, and, desc, sql } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import type {
   PortfolioAggregation,
   PortfolioAggregationRequest,
   PortfolioAggregationResponse,
   DonutChartData,
 } from "@/types/portfolio"
+import { getCurrentPrice } from "@/lib/services/price-service"
 
 // Helper function to generate shades of a base color
 function generateColorShades(baseColor: string, count: number): string[] {
@@ -74,23 +74,8 @@ export async function POST(request: Request) {
       holdings.map(async ({ user_portfolio, asset_type }) => {
         if (!asset_type) return null
 
-        // For Cash, use $1.00 per unit (no price history needed)
-        // For other assets, fetch latest price from history
-        let latestClosePrice: number
-
-        if (asset_type.assetClass === "Cash") {
-          latestClosePrice = 1.0
-        } else {
-          const latestPriceRecord = await db
-            .select()
-            .from(assetHistory)
-            .where(eq(assetHistory.assetId, asset_type.assetId))
-            .orderBy(desc(assetHistory.date))
-            .limit(1)
-
-          // Fallback to average cost if no price history exists
-          latestClosePrice = latestPriceRecord[0]?.closePrice || user_portfolio.avgCostPerUnit || 0
-        }
+        // Fetch real-time price using price service
+        const latestClosePrice = await getCurrentPrice(asset_type.assetTicker)
         const currentAmount = user_portfolio.assetTotalUnits * latestClosePrice
         const gainLoss = currentAmount - user_portfolio.investmentAmount
         const gainLossPercent =
@@ -167,23 +152,21 @@ export async function POST(request: Request) {
       }
 
       // Normal aggregation (non-sector)
-      if (dimension !== "sector") {
-        if (aggregationMap.has(key)) {
-          const existing = aggregationMap.get(key)!
-          existing.totalValue += holding.currentAmount || 0
-          existing.percentageReturn =
-            ((existing.percentageReturn || 0) + (holding.gainLossPercent || 0)) /
-            (existing.count! + 1)
-          existing.count! += 1
-        } else {
-          aggregationMap.set(key, {
-            dimension,
-            label: key,
-            totalValue: holding.currentAmount || 0,
-            percentageReturn: holding.gainLossPercent || 0,
-            count: 1,
-          })
-        }
+      if (aggregationMap.has(key)) {
+        const existing = aggregationMap.get(key)!
+        existing.totalValue += holding.currentAmount || 0
+        existing.percentageReturn =
+          ((existing.percentageReturn || 0) + (holding.gainLossPercent || 0)) /
+          (existing.count! + 1)
+        existing.count! += 1
+      } else {
+        aggregationMap.set(key, {
+          dimension,
+          label: key,
+          totalValue: holding.currentAmount || 0,
+          percentageReturn: holding.gainLossPercent || 0,
+          count: 1,
+        })
       }
     }
 
@@ -257,6 +240,47 @@ export async function POST(request: Request) {
       "Mutual Fund": "#666666", // Darker gray for mutual funds
     }
 
+    // Define vibrant color palette for sectors
+    const sectorColors: Record<string, string> = {
+      "Technology": "#00D9FF",        // Bright Cyan
+      "Healthcare": "#00FF88",        // Bright Green
+      "Financial Services": "#FFD700", // Gold
+      "Consumer Cyclical": "#FF6B9D",  // Pink
+      "Energy": "#FF4500",            // Orange Red
+      "Industrials": "#9370DB",       // Purple
+      "Consumer Defensive": "#32CD32", // Lime Green
+      "Real Estate": "#FF8C00",       // Dark Orange
+      "Utilities": "#4169E1",         // Royal Blue
+      "Communication Services": "#FF1493", // Deep Pink
+      "Basic Materials": "#8B4513",   // Saddle Brown
+      "Financial": "#FFD700",         // Gold (alternate)
+      "Telecommunications": "#BA55D3", // Orchid
+      "Media": "#DC143C",             // Crimson
+      "Retail": "#FF69B4",            // Hot Pink
+      "Transportation": "#1E90FF",    // Dodger Blue
+      "Insurance": "#FFA500",         // Orange
+      "Banking": "#DAA520",           // Goldenrod
+    }
+
+    // Default color palette for other dimensions (ticker, manager, etc.)
+    const defaultColorPalette = [
+      "#00D9FF", "#00FF88", "#FFD700", "#FF6B9D", "#FF4500",
+      "#9370DB", "#32CD32", "#FF8C00", "#4169E1", "#FF1493",
+      "#8B4513", "#BA55D3", "#DC143C", "#FF69B4", "#1E90FF",
+      "#FFA500", "#DAA520", "#20B2AA", "#FF6347", "#7B68EE"
+    ]
+
+    // Select appropriate color mapping based on dimension
+    let colors: string[]
+    if (dimension === "asset_class") {
+      colors = aggregation.map((a) => assetClassColors[a.label] || "#B3B3B3")
+    } else if (dimension === "sector") {
+      colors = aggregation.map((a) => sectorColors[a.label] || defaultColorPalette[aggregation.indexOf(a) % defaultColorPalette.length])
+    } else {
+      // For ticker, manager, category, concentration - use default palette
+      colors = aggregation.map((a, index) => defaultColorPalette[index % defaultColorPalette.length])
+    }
+
     // Create chart data with proper colors
     const chartData: DonutChartData = {
       labels: aggregation.map((a) => a.label),
@@ -264,7 +288,7 @@ export async function POST(request: Request) {
         metric === "total_value"
           ? aggregation.map((a) => a.totalValue)
           : aggregation.map((a) => a.percentageReturn || 0),
-      colors: aggregation.map((a) => assetClassColors[a.label] || "#B3B3B3"),
+      colors,
     }
 
     const response: PortfolioAggregationResponse = {

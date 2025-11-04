@@ -25,6 +25,10 @@ export function usePortfolioAnalysis() {
   const [aggregationDimension, setAggregationDimension] = useState<string>("")
   const [isLoadingAggregation, setIsLoadingAggregation] = useState<boolean>(false)
 
+  // Sector aggregation state (separate from general aggregation)
+  const [sectorChartData, setSectorChartData] = useState<DonutChartData | null>(null)
+  const [isLoadingSector, setIsLoadingSector] = useState<boolean>(false)
+
   // Benchmark state
   const [benchmarkComparison, setBenchmarkComparison] = useState<BenchmarkComparison[]>([])
   const [benchmarkChartData, setBenchmarkChartData] = useState<BenchmarkChartData | null>(
@@ -57,6 +61,7 @@ export function usePortfolioAnalysis() {
     setAggregationData([])
     setAggregationChartData(null)
     setAggregationDimension("")
+    setSectorChartData(null)
     setBenchmarkComparison([])
     setBenchmarkChartData(null)
     setBenchmarkType("")
@@ -80,6 +85,12 @@ export function usePortfolioAnalysis() {
     setAggregationDimension,
     isLoadingAggregation,
     setIsLoadingAggregation,
+
+    // Sector (separate state for sector chart)
+    sectorChartData,
+    setSectorChartData,
+    isLoadingSector,
+    setIsLoadingSector,
 
     // Benchmark
     benchmarkComparison,

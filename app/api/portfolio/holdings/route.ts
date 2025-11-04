@@ -38,29 +38,36 @@ export async function GET(request: Request) {
           } as PortfolioHolding
         }
 
-        // Get latest real-time price from Yahoo Finance API
+        // Get latest real-time price
         let latestClosePrice = 0
-        try {
-          const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
-          const quoteResponse = await fetch(`${baseUrl}/api/stock/quote?symbol=${asset_type.assetTicker}`)
 
-          // Check if response is OK before parsing
-          if (!quoteResponse.ok) {
-            console.warn(`Quote API returned ${quoteResponse.status} for ${asset_type.assetTicker}`)
-            latestClosePrice = 0
-          } else {
-            const quoteData = await quoteResponse.json()
+        // For Cash, always use $1.00 (no need to fetch from API)
+        if (asset_type.assetClass === "Cash") {
+          latestClosePrice = 1.0
+        } else {
+          // Get real-time price from Yahoo Finance API for other assets
+          try {
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+            const quoteResponse = await fetch(`${baseUrl}/api/stock/quote?symbol=${asset_type.assetTicker}`)
 
-            if (quoteData.success && quoteData.data?.price) {
-              latestClosePrice = quoteData.data.price
-            } else {
-              console.warn(`Failed to fetch real-time price for ${asset_type.assetTicker}: ${quoteData.error || 'Unknown error'}`)
+            // Check if response is OK before parsing
+            if (!quoteResponse.ok) {
+              console.warn(`Quote API returned ${quoteResponse.status} for ${asset_type.assetTicker}`)
               latestClosePrice = 0
+            } else {
+              const quoteData = await quoteResponse.json()
+
+              if (quoteData.success && quoteData.data?.price) {
+                latestClosePrice = quoteData.data.price
+              } else {
+                console.warn(`Failed to fetch real-time price for ${asset_type.assetTicker}: ${quoteData.error || 'Unknown error'}`)
+                latestClosePrice = 0
+              }
             }
+          } catch (error) {
+            console.error(`Error fetching real-time price for ${asset_type.assetTicker}:`, error)
+            latestClosePrice = 0
           }
-        } catch (error) {
-          console.error(`Error fetching real-time price for ${asset_type.assetTicker}:`, error)
-          latestClosePrice = 0
         }
         const currentAmount = user_portfolio.assetTotalUnits * latestClosePrice
         const gainLoss = currentAmount - user_portfolio.investmentAmount

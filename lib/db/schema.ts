@@ -151,6 +151,15 @@ export const assetClassRiskLevelMapping = sqliteTable("asset_class_risk_level_ma
   addon2: real("addon2"),
 })
 
+// Price Cache table - Caches historical prices from Yahoo Finance API
+export const priceCache = sqliteTable("price_cache", {
+  cacheId: integer("cache_id").primaryKey({ autoIncrement: true }),
+  symbol: text("symbol", { length: 10 }).notNull(),
+  date: text("date").notNull(), // ISO date string YYYY-MM-DD
+  closePrice: real("close_price").notNull(),
+  cachedAt: text("cached_at").notNull(), // ISO timestamp when cached
+})
+
 // Define relations
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(userAccounts),

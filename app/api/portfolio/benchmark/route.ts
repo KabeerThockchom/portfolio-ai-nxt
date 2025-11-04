@@ -3,10 +3,10 @@ import { db } from "@/lib/db/connection"
 import {
   userPortfolio,
   assetType,
-  assetHistory,
 } from "@/lib/db/schema"
-import { eq, and, desc, lte } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import type { BenchmarkRequest, BenchmarkResponse } from "@/types/portfolio"
+import { getHistoricalPrices } from "@/lib/services/price-service"
 
 // Helper to calculate time periods based on interval
 function getTimePeriods(
@@ -39,24 +39,22 @@ function getTimePeriods(
   return periods.reverse()
 }
 
-// Helper to get closest price on or before a target date
-async function getClosestPrice(
-  assetId: number,
+// Helper to get closest price on or before a target date from price array
+function getClosestPrice(
+  prices: Array<{ date: string; closePrice: number }>,
   targetDate: Date
-): Promise<number> {
-  const prices = await db
-    .select()
-    .from(assetHistory)
-    .where(
-      and(
-        eq(assetHistory.assetId, assetId),
-        lte(assetHistory.date, targetDate.toISOString().split("T")[0])
-      )
-    )
-    .orderBy(desc(assetHistory.date))
-    .limit(1)
+): number {
+  const targetDateStr = targetDate.toISOString().split("T")[0]
 
-  return prices[0]?.closePrice || 0
+  // Filter prices on or before target date
+  const validPrices = prices.filter(p => p.date <= targetDateStr)
+
+  if (validPrices.length === 0) {
+    return 0
+  }
+
+  // Return the closest (most recent) price
+  return validPrices[validPrices.length - 1].closePrice
 }
 
 export async function POST(request: Request) {
@@ -105,30 +103,57 @@ export async function POST(request: Request) {
       .where(eq(userPortfolio.userId, userId))
       .leftJoin(assetType, eq(userPortfolio.assetId, assetType.assetId))
 
-    // Calculate portfolio values for each period
-    const comparison = await Promise.all(
-      periods.map(async (date) => {
-        // Calculate total portfolio value at this date
-        let totalPortfolioValue = 0
+    // Fetch historical prices for all holdings and benchmark upfront (with caching)
+    const startDateStr = startDate.toISOString().split("T")[0]
+    const endDateStr = endDate.toISOString().split("T")[0]
 
-        for (const { user_portfolio, asset_type } of holdings) {
-          if (!asset_type) continue
+    // Create price map: symbol -> prices array
+    const priceMap = new Map<string, Array<{ date: string; closePrice: number }>>()
 
-          const price = await getClosestPrice(asset_type.assetId, date)
-          const value = user_portfolio.assetTotalUnits * price
-          totalPortfolioValue += value
-        }
+    // Fetch prices for each holding
+    await Promise.all(
+      holdings.map(async ({ asset_type }) => {
+        if (!asset_type) return
 
-        // Get benchmark price at this date
-        const benchmarkPrice = await getClosestPrice(benchmarkAssetId, date)
-
-        return {
-          date: date.toISOString().split("T")[0],
-          portfolioValue: totalPortfolioValue,
-          benchmarkPrice,
-        }
+        const prices = await getHistoricalPrices(
+          asset_type.assetTicker,
+          startDateStr,
+          endDateStr
+        )
+        priceMap.set(asset_type.assetTicker, prices)
       })
     )
+
+    // Fetch benchmark prices
+    const benchmarkPrices = await getHistoricalPrices(
+      benchmark,
+      startDateStr,
+      endDateStr
+    )
+
+    // Calculate portfolio values for each period
+    const comparison = periods.map((date) => {
+      // Calculate total portfolio value at this date
+      let totalPortfolioValue = 0
+
+      for (const { user_portfolio, asset_type } of holdings) {
+        if (!asset_type) continue
+
+        const prices = priceMap.get(asset_type.assetTicker) || []
+        const price = getClosestPrice(prices, date)
+        const value = user_portfolio.assetTotalUnits * price
+        totalPortfolioValue += value
+      }
+
+      // Get benchmark price at this date
+      const benchmarkPrice = getClosestPrice(benchmarkPrices, date)
+
+      return {
+        date: date.toISOString().split("T")[0],
+        portfolioValue: totalPortfolioValue,
+        benchmarkPrice,
+      }
+    })
 
     // Index to 100 at start
     const basePortfolioValue = comparison[0].portfolioValue || 1

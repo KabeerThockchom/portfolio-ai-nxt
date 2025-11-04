@@ -3,11 +3,10 @@ import { db } from "@/lib/db/connection"
 import {
   userPortfolio,
   assetType,
-  assetHistory,
   assetSector,
   assetClassRiskLevelMapping,
 } from "@/lib/db/schema"
-import { eq, and, desc, between, gte, lte } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import type {
   RiskAnalysisRequest,
   RiskAnalysisResponse,
@@ -15,6 +14,7 @@ import type {
   BubbleChartData,
   GaugeChartData,
 } from "@/types/portfolio"
+import { getCurrentPrice } from "@/lib/services/price-service"
 
 export async function POST(request: Request) {
   try {
@@ -43,14 +43,8 @@ export async function POST(request: Request) {
       holdings.map(async ({ user_portfolio, asset_type }) => {
         if (!asset_type) return null
 
-        const latestPriceRecord = await db
-          .select()
-          .from(assetHistory)
-          .where(eq(assetHistory.assetId, asset_type.assetId))
-          .orderBy(desc(assetHistory.date))
-          .limit(1)
-
-        const latestClosePrice = latestPriceRecord[0]?.closePrice || 0
+        // Fetch real-time price using price service
+        const latestClosePrice = await getCurrentPrice(asset_type.assetTicker)
         const currentAmount = user_portfolio.assetTotalUnits * latestClosePrice
 
         // Calculate risk score based on volatility and asset class
@@ -141,31 +135,29 @@ export async function POST(request: Request) {
       }
 
       // Normal aggregation (non-sector)
-      if (dimension !== "sector") {
-        if (riskMap.has(key)) {
-          const existing = riskMap.get(key)!
-          const totalValue = existing.investmentAmount + (holding.currentAmount || 0)
-          // Weighted average risk score
-          existing.riskScore =
-            (existing.riskScore * existing.investmentAmount +
-              (holding.riskScore || 0) * (holding.currentAmount || 0)) /
-            totalValue
-          existing.investmentAmount = totalValue
-          // Update volatility (weighted average)
-          existing.volatility =
-            ((existing.volatility || 0) * existing.investmentAmount +
-              (holding.volatility || 0) * (holding.currentAmount || 0)) /
-            totalValue
-        } else {
-          riskMap.set(key, {
-            dimension: dimension || "asset_class",
-            label: key,
-            investmentAmount: holding.currentAmount || 0,
-            riskScore: holding.riskScore || 0,
-            volatility: holding.volatility,
-            concentration: holding.concentration,
-          })
-        }
+      if (riskMap.has(key)) {
+        const existing = riskMap.get(key)!
+        const totalValue = existing.investmentAmount + (holding.currentAmount || 0)
+        // Weighted average risk score
+        existing.riskScore =
+          (existing.riskScore * existing.investmentAmount +
+            (holding.riskScore || 0) * (holding.currentAmount || 0)) /
+          totalValue
+        existing.investmentAmount = totalValue
+        // Update volatility (weighted average)
+        existing.volatility =
+          ((existing.volatility || 0) * existing.investmentAmount +
+            (holding.volatility || 0) * (holding.currentAmount || 0)) /
+          totalValue
+      } else {
+        riskMap.set(key, {
+          dimension: dimension || "asset_class",
+          label: key,
+          investmentAmount: holding.currentAmount || 0,
+          riskScore: holding.riskScore || 0,
+          volatility: holding.volatility,
+          concentration: holding.concentration,
+        })
       }
     }
 

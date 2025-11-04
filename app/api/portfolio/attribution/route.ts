@@ -3,33 +3,31 @@ import { db } from "@/lib/db/connection"
 import {
   userPortfolio,
   assetType,
-  assetHistory,
   assetSector,
 } from "@/lib/db/schema"
-import { eq, and, desc, lte } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import type {
   ReturnsAttributionRequest,
   ReturnsAttributionResponse,
 } from "@/types/portfolio"
+import { getHistoricalPrices } from "@/lib/services/price-service"
 
-// Helper to get price at a specific date or closest before
-async function getPriceAtDate(
-  assetId: number,
+// Helper to get price at a specific date or closest before from price array
+function getPriceAtDate(
+  prices: Array<{ date: string; closePrice: number }>,
   targetDate: Date
-): Promise<number | null> {
-  const prices = await db
-    .select()
-    .from(assetHistory)
-    .where(
-      and(
-        eq(assetHistory.assetId, assetId),
-        lte(assetHistory.date, targetDate.toISOString().split("T")[0])
-      )
-    )
-    .orderBy(desc(assetHistory.date))
-    .limit(1)
+): number | null {
+  const targetDateStr = targetDate.toISOString().split("T")[0]
 
-  return prices[0]?.closePrice || null
+  // Filter prices on or before target date
+  const validPrices = prices.filter(p => p.date <= targetDateStr)
+
+  if (validPrices.length === 0) {
+    return null
+  }
+
+  // Return the closest (most recent) price
+  return validPrices[validPrices.length - 1].closePrice
 }
 
 // Helper to calculate date range based on period
@@ -87,16 +85,36 @@ export async function POST(request: Request) {
       .where(eq(userPortfolio.userId, userId))
       .leftJoin(assetType, eq(userPortfolio.assetId, assetType.assetId))
 
+    // Fetch historical prices for all holdings upfront (with caching)
+    const startDateStr = startDate.toISOString().split("T")[0]
+    const endDateStr = endDate.toISOString().split("T")[0]
+
+    // Create price map: symbol -> prices array
+    const priceMap = new Map<string, Array<{ date: string; closePrice: number }>>()
+
+    await Promise.all(
+      holdings.map(async ({ asset_type }) => {
+        if (!asset_type) return
+
+        const prices = await getHistoricalPrices(
+          asset_type.assetTicker,
+          startDateStr,
+          endDateStr
+        )
+        priceMap.set(asset_type.assetTicker, prices)
+      })
+    )
+
     // Calculate total portfolio value at start and end
     let totalStartValue = 0
     let totalEndValue = 0
 
-    const enrichedHoldings = await Promise.all(
-      holdings.map(async ({ user_portfolio, asset_type }) => {
+    const enrichedHoldings = holdings.map(({ user_portfolio, asset_type }) => {
         if (!asset_type) return null
 
-        const startPrice = await getPriceAtDate(asset_type.assetId, startDate)
-        const endPrice = await getPriceAtDate(asset_type.assetId, endDate)
+        const prices = priceMap.get(asset_type.assetTicker) || []
+        const startPrice = getPriceAtDate(prices, startDate)
+        const endPrice = getPriceAtDate(prices, endDate)
 
         if (!startPrice || !endPrice) return null
 
@@ -117,7 +135,6 @@ export async function POST(request: Request) {
           percentReturn,
         }
       })
-    )
 
     const validHoldings = enrichedHoldings.filter((h) => h !== null)
     const totalReturn = totalEndValue - totalStartValue

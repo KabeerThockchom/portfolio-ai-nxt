@@ -3,9 +3,9 @@ import { db } from "@/lib/db/connection"
 import {
   userPortfolio,
   assetType,
-  assetHistory,
 } from "@/lib/db/schema"
-import { eq, and, desc, gte } from "drizzle-orm"
+import { eq } from "drizzle-orm"
+import { getHistoricalPrices } from "@/lib/services/price-service"
 
 export interface PriceTrendRequest {
   userId: string
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     let holdings = await db
       .select()
       .from(userPortfolio)
-      .where(eq(userPortfolio.userId, userId))
+      .where(eq(userPortfolio.userId, parseInt(userId)))
       .leftJoin(assetType, eq(userPortfolio.assetId, assetType.assetId))
 
     // Filter by specific tickers if provided
@@ -75,21 +75,19 @@ export async function POST(request: Request) {
     startDate.setFullYear(startDate.getFullYear() - timeHistory)
 
     // Fetch price trends for each holding
+    const startDateStr = startDate.toISOString().split("T")[0]
+    const endDateStr = endDate.toISOString().split("T")[0]
+
     const trends: PriceTrendData[] = await Promise.all(
       holdings.map(async ({ user_portfolio, asset_type }) => {
         if (!asset_type) return null
 
-        // Fetch historical prices
-        const prices = await db
-          .select()
-          .from(assetHistory)
-          .where(
-            and(
-              eq(assetHistory.assetId, asset_type.assetId),
-              gte(assetHistory.date, startDate.toISOString().split("T")[0])
-            )
-          )
-          .orderBy(assetHistory.date)
+        // Fetch historical prices using price service (with caching)
+        const prices = await getHistoricalPrices(
+          asset_type.assetTicker,
+          startDateStr,
+          endDateStr
+        )
 
         if (prices.length === 0) return null
 
