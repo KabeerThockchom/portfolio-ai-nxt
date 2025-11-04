@@ -14,6 +14,19 @@ import type {
   PlaceOrderRequest,
   PlaceOrderResponse,
   OrderHistoryResponse,
+  AccountListResponse,
+  AccountBalanceResponse,
+  DepositRequest,
+  DepositResponse,
+  WithdrawalRequest,
+  WithdrawalResponse,
+  CreateAccountRequest,
+  CreateAccountResponse,
+  ConfirmOrderRequest,
+  ConfirmOrderResponse,
+  RejectOrderRequest,
+  RejectOrderResponse,
+  TransactionHistoryResponse,
 } from "@/types/portfolio"
 
 /**
@@ -119,6 +132,81 @@ export function usePortfolioApi() {
     return response.json()
   }
 
+  // Confirm order
+  const confirmOrder = async (request: ConfirmOrderRequest): Promise<ConfirmOrderResponse> => {
+    const response = await fetch("/api/orders/confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    })
+    return response.json()
+  }
+
+  // Reject order
+  const rejectOrder = async (request: RejectOrderRequest): Promise<RejectOrderResponse> => {
+    const response = await fetch("/api/orders/reject", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    })
+    return response.json()
+  }
+
+  // Get account list
+  const fetchAccountList = async (userId: number): Promise<AccountListResponse> => {
+    const response = await fetch(`/api/accounts/list?userId=${userId}`)
+    return response.json()
+  }
+
+  // Get account balance
+  const fetchAccountBalance = async (accountId: number): Promise<AccountBalanceResponse> => {
+    const response = await fetch(`/api/accounts/${accountId}/balance`)
+    return response.json()
+  }
+
+  // Create account
+  const createAccount = async (request: CreateAccountRequest): Promise<CreateAccountResponse> => {
+    const response = await fetch("/api/accounts/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    })
+    return response.json()
+  }
+
+  // Deposit funds
+  const depositFunds = async (request: DepositRequest): Promise<DepositResponse> => {
+    const response = await fetch("/api/accounts/deposit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    })
+    return response.json()
+  }
+
+  // Withdraw funds
+  const withdrawFunds = async (request: WithdrawalRequest): Promise<WithdrawalResponse> => {
+    const response = await fetch("/api/accounts/withdraw", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    })
+    return response.json()
+  }
+
+  // Get transaction history
+  const fetchTransactionHistory = async (
+    userId: number,
+    accountId?: number,
+    type?: string
+  ): Promise<TransactionHistoryResponse> => {
+    let url = `/api/transactions/history?userId=${userId}`
+    if (accountId) url += `&accountId=${accountId}`
+    if (type) url += `&type=${type}`
+    const response = await fetch(url)
+    return response.json()
+  }
+
   return {
     fetchPortfolioHoldings,
     fetchPortfolioAggregation,
@@ -130,5 +218,13 @@ export function usePortfolioApi() {
     placeOrder,
     fetchOrderHistory,
     cancelOrder,
+    confirmOrder,
+    rejectOrder,
+    fetchAccountList,
+    fetchAccountBalance,
+    createAccount,
+    depositFunds,
+    withdrawFunds,
+    fetchTransactionHistory,
   }
 }

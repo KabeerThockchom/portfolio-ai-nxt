@@ -41,24 +41,42 @@ export interface PortfolioHolding {
   gainLossPercent?: number
 }
 
+// Account
+export interface Account {
+  accountId: number
+  userId: number
+  accountName: string
+  accountType: "checking" | "savings" | "brokerage"
+  cashBalance: number
+  isDefault: boolean
+  createdAt: string
+}
+
 // Transaction
 export interface Transaction {
   transId: number
   userId: number
-  assetId: number
-  transType: "Buy" | "Sell"
+  accountId?: number
+  assetId?: number
+  transType: "BUY" | "SELL" | "DEPOSIT" | "WITHDRAW"
   date: string
-  units: number
-  pricePerUnit: number
+  units?: number
+  pricePerUnit?: number
   cost: number
+  description?: string
   // Joined fields
   asset?: Asset
+  accountName?: string
+  accountType?: string
+  assetTicker?: string
+  assetName?: string
 }
 
 // Order
 export interface Order {
   orderId: number
   userId: number
+  accountId?: number
   assetId: number
   orderType: string // Market Open, Limit, etc.
   symbol: string
@@ -70,9 +88,23 @@ export interface Order {
   amount: number
   settlementDate: string
   orderStatus: "Placed" | "Under Review" | "Cancelled" | "Executed"
+  confirmationStatus: "pending_confirmation" | "confirmed" | "rejected"
   orderDate: string
   // Joined fields
   asset?: Asset
+}
+
+// Order preview (shown before confirmation)
+export interface OrderPreview {
+  orderId: number
+  symbol: string
+  buySell: "Buy" | "Sell"
+  quantity: number
+  estimatedPrice: number
+  estimatedTotal: number
+  accountName: string
+  accountBalance: number
+  balanceAfterTrade: number
 }
 
 // Asset historical price
@@ -237,6 +269,7 @@ export interface RelativePerformanceRequest {
 
 export interface PlaceOrderRequest {
   userId: number
+  accountId: number
   symbol: string
   buySell: "Buy" | "Sell"
   orderType: "Market Open" | "Limit"
@@ -247,6 +280,33 @@ export interface PlaceOrderRequest {
 export interface CancelOrderRequest {
   userId: number
   orderId: number
+}
+
+export interface ConfirmOrderRequest {
+  orderId: number
+}
+
+export interface RejectOrderRequest {
+  orderId: number
+}
+
+export interface DepositRequest {
+  accountId: number
+  amount: number
+  description?: string
+}
+
+export interface WithdrawalRequest {
+  accountId: number
+  amount: number
+  description?: string
+}
+
+export interface CreateAccountRequest {
+  userId: number
+  accountName: string
+  accountType: "checking" | "savings" | "brokerage"
+  initialBalance?: number
 }
 
 // API response types
@@ -299,6 +359,66 @@ export type OrderHistoryResponse = ApiResponse<{
 export type PlaceOrderResponse = ApiResponse<{
   order: Order
   message: string
+  orderPreview: OrderPreview
+}>
+
+export type ConfirmOrderResponse = ApiResponse<{
+  orderId: number
+  message: string
+  newBalance: number
+}>
+
+export type RejectOrderResponse = ApiResponse<{
+  orderId: number
+  message: string
+}>
+
+export type AccountListResponse = ApiResponse<{
+  accounts: Account[]
+  totalCash: number
+}>
+
+export type AccountBalanceResponse = ApiResponse<{
+  accountId: number
+  accountName: string
+  accountType: string
+  cashBalance: number
+}>
+
+export type DepositResponse = ApiResponse<{
+  accountId: number
+  accountName: string
+  depositAmount: number
+  previousBalance: number
+  newBalance: number
+  transactionId: number
+  timestamp: string
+}>
+
+export type WithdrawalResponse = ApiResponse<{
+  accountId: number
+  accountName: string
+  withdrawAmount: number
+  previousBalance: number
+  newBalance: number
+  transactionId: number
+  timestamp: string
+}>
+
+export type CreateAccountResponse = ApiResponse<{
+  account: Account
+  message: string
+}>
+
+export type TransactionHistoryResponse = ApiResponse<{
+  transactions: Transaction[]
+  totalTransactions: number
+  summary: {
+    totalDeposits: number
+    totalWithdrawals: number
+    totalBuys: number
+    totalSells: number
+  }
 }>
 
 export type CashBalanceResponse = ApiResponse<{

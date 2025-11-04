@@ -1,36 +1,21 @@
-import Database from "better-sqlite3"
-import { drizzle } from "drizzle-orm/better-sqlite3"
+import { createClient } from "@libsql/client"
+import { drizzle } from "drizzle-orm/libsql"
 import * as schema from "./schema"
-import path from "path"
 
-// Get the database path
-const dbPath = path.join(process.cwd(), "data", "portfolio.sqlite3")
-
-// Create SQLite connection
-let sqlite: Database.Database | null = null
-
-function getConnection(): Database.Database {
-  if (!sqlite) {
-    sqlite = new Database(dbPath, {
-      // Enable verbose mode for debugging (optional)
-      // verbose: console.log,
-    })
-    // Enable foreign keys
-    sqlite.pragma("foreign_keys = ON")
-  }
-  return sqlite
-}
+// Create Turso client
+const turso = createClient({
+  url: process.env.TURSO_DATABASE_URL!,
+  authToken: process.env.TURSO_AUTH_TOKEN!,
+})
 
 // Create Drizzle instance with schema
-export const db = drizzle(getConnection(), { schema })
+export const db = drizzle(turso, { schema })
 
-// Export connection for direct SQL queries if needed
-export const getDb = () => getConnection()
+// Export Turso client for direct queries if needed
+export const getTursoClient = () => turso
 
 // Close connection (useful for cleanup in tests or scripts)
 export function closeDb() {
-  if (sqlite) {
-    sqlite.close()
-    sqlite = null
-  }
+  // Turso client doesn't require explicit cleanup
+  // Connection is managed automatically
 }

@@ -288,19 +288,98 @@ export const voiceAssistantTools = [
   },
   {
     type: "function",
-    name: "placeOrder",
-    description: "Places a buy or sell order for a stock. Supports Market Open orders (execute at next market open) and Limit orders (execute only at specified price or better). Validates cash balance for buy orders and checks holdings for sell orders.",
+    name: "getAccounts",
+    description: "Gets all user accounts including checking, savings, and brokerage accounts with their balances. Use this to show available accounts or before placing trades to let user choose which account to use.",
     parameters: {
       type: "object",
       properties: {
         userId: { type: "number", description: "User ID (default: 1)" },
+      },
+      required: [],
+    },
+  },
+  {
+    type: "function",
+    name: "depositFunds",
+    description: "Instantly deposits cash into a specified account. Funds are available immediately. Use this when user wants to add money to their account for trading or other purposes.",
+    parameters: {
+      type: "object",
+      properties: {
+        accountId: { type: "number", description: "Account ID to deposit into" },
+        amount: { type: "number", description: "Amount to deposit (must be positive)" },
+        description: { type: "string", description: "Optional description (e.g., 'Monthly savings', 'Transfer from bank')" },
+      },
+      required: ["accountId", "amount"],
+    },
+  },
+  {
+    type: "function",
+    name: "withdrawFunds",
+    description: "Withdraws cash from a specified account. Validates sufficient balance before withdrawal. Use this when user wants to take money out of their account.",
+    parameters: {
+      type: "object",
+      properties: {
+        accountId: { type: "number", description: "Account ID to withdraw from" },
+        amount: { type: "number", description: "Amount to withdraw (must be positive and <= available balance)" },
+        description: { type: "string", description: "Optional description (e.g., 'Emergency expense', 'Transfer to bank')" },
+      },
+      required: ["accountId", "amount"],
+    },
+  },
+  {
+    type: "function",
+    name: "placeOrder",
+    description: "Places a buy or sell order for a stock from a specific account. IMPORTANT: This creates a PENDING order that requires user confirmation before execution. The order will NOT execute immediately - user must approve or reject it. Returns order preview with estimated costs and balance impact. Supports Market Open orders (execute at next market open) and Limit orders (execute only at specified price or better). Validates account cash balance for buy orders.",
+    parameters: {
+      type: "object",
+      properties: {
+        userId: { type: "number", description: "User ID (default: 1)" },
+        accountId: { type: "number", description: "Account ID to trade from (required)" },
         symbol: { type: "string", description: "Stock symbol to trade (e.g., AAPL, MSFT)" },
         buySell: { type: "string", description: "'Buy' or 'Sell'" },
         orderType: { type: "string", description: "'Market Open' or 'Limit'" },
         qty: { type: "number", description: "Quantity of shares to trade" },
         price: { type: "number", description: "Limit price (required for Limit orders, optional for Market Open)" },
       },
-      required: ["symbol", "buySell", "orderType", "qty"],
+      required: ["accountId", "symbol", "buySell", "orderType", "qty"],
+    },
+  },
+  {
+    type: "function",
+    name: "confirmOrder",
+    description: "Confirms and executes a pending order. This is the REQUIRED second step after placeOrder. Only call this after presenting the order preview to the user and getting their verbal confirmation. Updates account balance, portfolio holdings, and creates transaction record. Cannot be undone once confirmed.",
+    parameters: {
+      type: "object",
+      properties: {
+        orderId: { type: "number", description: "Order ID to confirm (from placeOrder response)" },
+      },
+      required: ["orderId"],
+    },
+  },
+  {
+    type: "function",
+    name: "rejectOrder",
+    description: "Rejects and cancels a pending order. Use this when user decides not to proceed with the trade after seeing the order preview. The order will be cancelled and no money or shares will be exchanged.",
+    parameters: {
+      type: "object",
+      properties: {
+        orderId: { type: "number", description: "Order ID to reject (from placeOrder response)" },
+      },
+      required: ["orderId"],
+    },
+  },
+  {
+    type: "function",
+    name: "getTransactionHistory",
+    description: "Gets unified transaction history showing all money movements: deposits, withdrawals, buys, and sells. Displays transactions from all accounts with dates, amounts, symbols, and descriptions. Can filter by account or transaction type.",
+    parameters: {
+      type: "object",
+      properties: {
+        userId: { type: "number", description: "User ID (default: 1)" },
+        accountId: { type: "number", description: "Optional: filter by specific account ID" },
+        type: { type: "string", description: "Optional: filter by type ('DEPOSIT', 'WITHDRAW', 'BUY', 'SELL', or 'all')" },
+      },
+      required: [],
     },
   },
   {

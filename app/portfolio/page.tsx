@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { RefreshCw } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { RefreshCw, DollarSign, ArrowDownCircle, ArrowUpCircle } from "lucide-react"
 
 // Portfolio components
 import { PortfolioSummaryCard } from "@/components/portfolio/portfolio-summary-card"
@@ -15,11 +16,16 @@ import { BenchmarkChart } from "@/components/portfolio/benchmark-chart"
 import { WaterfallChart } from "@/components/portfolio/waterfall-chart"
 import { TradeForm } from "@/components/portfolio/trade-form"
 import { OrderHistoryTable } from "@/components/portfolio/order-history-table"
+import { DepositDialog } from "@/components/portfolio/deposit-dialog"
+import { WithdrawDialog } from "@/components/portfolio/withdraw-dialog"
+import { OrderConfirmationDialog } from "@/components/portfolio/order-confirmation-dialog"
+import { TransactionHistoryTable } from "@/components/portfolio/transaction-history-table"
 
 // Hooks
 import { usePortfolioData } from "@/hooks/use-portfolio-data"
 import { usePortfolioAnalysis } from "@/hooks/use-portfolio-analysis"
 import { useOrders } from "@/hooks/use-orders"
+import { useAccounts } from "@/hooks/use-accounts"
 import { usePortfolioApi } from "@/hooks/use-portfolio-api"
 import { useToast } from "@/hooks/use-toast"
 
@@ -31,15 +37,21 @@ export default function PortfolioPage() {
   const portfolioData = usePortfolioData()
   const portfolioAnalysis = usePortfolioAnalysis()
   const ordersData = useOrders()
+  const accountsData = useAccounts()
 
   // Default user ID (in production, this would come from auth)
   const [userId] = useState(1)
 
+  // Dialog states
+  const [showDepositDialog, setShowDepositDialog] = useState(false)
+  const [showWithdrawDialog, setShowWithdrawDialog] = useState(false)
+
   // Load portfolio data on mount
   useEffect(() => {
     loadPortfolioData()
-    loadCashBalance()
+    loadAccounts()
     loadOrderHistory()
+    loadTransactionHistory()
   }, [])
 
   const loadPortfolioData = async () => {
@@ -71,21 +83,43 @@ export default function PortfolioPage() {
     }
   }
 
-  const loadCashBalance = async () => {
-    portfolioData.setIsLoadingCash(true)
+  const loadAccounts = async () => {
+    accountsData.setIsLoadingAccounts(true)
 
     try {
-      const result = await portfolioApi.fetchCashBalance(userId)
+      const result = await portfolioApi.fetchAccountList(userId)
 
       if (result.success && result.data) {
-        portfolioData.setCashBalance(result.data.cashBalance)
-        portfolioData.setTotalPortfolioValue(result.data.totalPortfolioValue)
-        portfolioData.setTotalInvested(result.data.totalInvested)
+        accountsData.setAccounts(result.data.accounts)
+        accountsData.setTotalCash(result.data.totalCash)
+
+        // Set default account as selected if none selected
+        if (!accountsData.selectedAccount && result.data.accounts.length > 0) {
+          const defaultAccount = result.data.accounts.find((acc) => acc.isDefault)
+          accountsData.setSelectedAccount(defaultAccount || result.data.accounts[0])
+        }
       }
     } catch (error) {
-      console.error("Error loading cash balance:", error)
+      console.error("Error loading accounts:", error)
     } finally {
-      portfolioData.setIsLoadingCash(false)
+      accountsData.setIsLoadingAccounts(false)
+    }
+  }
+
+  const loadTransactionHistory = async () => {
+    accountsData.setIsLoadingTransactions(true)
+
+    try {
+      const result = await portfolioApi.fetchTransactionHistory(userId)
+
+      if (result.success && result.data) {
+        accountsData.setTransactions(result.data.transactions)
+        accountsData.setTransactionSummary(result.data.summary)
+      }
+    } catch (error) {
+      console.error("Error loading transaction history:", error)
+    } finally {
+      accountsData.setIsLoadingTransactions(false)
     }
   }
 
@@ -149,10 +183,128 @@ export default function PortfolioPage() {
     }
   }
 
+  const handleDeposit = async (accountId: number, amount: number, description?: string) => {
+    accountsData.setIsProcessingDeposit(true)
+
+    try {
+      const result = await portfolioApi.depositFunds({ accountId, amount, description })
+
+      if (result.success) {
+        toast({
+          title: "Deposit Successful",
+          description: `Deposited $${amount.toLocaleString()} to ${result.data?.accountName}`,
+        })
+        await loadAccounts()
+        await loadTransactionHistory()
+      } else {
+        throw new Error(result.error)
+      }
+    } catch (error: any) {
+      toast({
+        title: "Deposit Failed",
+        description: error.message || "Failed to process deposit",
+        variant: "destructive",
+      })
+      throw error
+    } finally {
+      accountsData.setIsProcessingDeposit(false)
+    }
+  }
+
+  const handleWithdraw = async (accountId: number, amount: number, description?: string) => {
+    accountsData.setIsProcessingWithdrawal(true)
+
+    try {
+      const result = await portfolioApi.withdrawFunds({ accountId, amount, description })
+
+      if (result.success) {
+        toast({
+          title: "Withdrawal Successful",
+          description: `Withdrew $${amount.toLocaleString()} from ${result.data?.accountName}`,
+        })
+        await loadAccounts()
+        await loadTransactionHistory()
+      } else {
+        throw new Error(result.error)
+      }
+    } catch (error: any) {
+      toast({
+        title: "Withdrawal Failed",
+        description: error.message || "Failed to process withdrawal",
+        variant: "destructive",
+      })
+      throw error
+    } finally {
+      accountsData.setIsProcessingWithdrawal(false)
+    }
+  }
+
+  const handleConfirmOrder = async (orderId: number) => {
+    accountsData.setIsConfirmingOrder(true)
+
+    try {
+      const result = await portfolioApi.confirmOrder({ orderId })
+
+      if (result.success) {
+        toast({
+          title: "Order Confirmed",
+          description: result.data?.message || "Order has been executed successfully",
+        })
+        await loadAccounts()
+        await loadPortfolioData()
+        await loadOrderHistory()
+        await loadTransactionHistory()
+        accountsData.setShowOrderConfirmation(false)
+        accountsData.setPendingOrder(null)
+      } else {
+        throw new Error(result.error)
+      }
+    } catch (error: any) {
+      toast({
+        title: "Order Confirmation Failed",
+        description: error.message || "Failed to confirm order",
+        variant: "destructive",
+      })
+      throw error
+    } finally {
+      accountsData.setIsConfirmingOrder(false)
+    }
+  }
+
+  const handleRejectOrder = async (orderId: number) => {
+    accountsData.setIsConfirmingOrder(true)
+
+    try {
+      const result = await portfolioApi.rejectOrder({ orderId })
+
+      if (result.success) {
+        toast({
+          title: "Order Rejected",
+          description: result.data?.message || "Order has been cancelled",
+        })
+        await loadOrderHistory()
+        accountsData.setShowOrderConfirmation(false)
+        accountsData.setPendingOrder(null)
+      } else {
+        throw new Error(result.error)
+      }
+    } catch (error: any) {
+      toast({
+        title: "Order Rejection Failed",
+        description: error.message || "Failed to reject order",
+        variant: "destructive",
+      })
+      throw error
+    } finally {
+      accountsData.setIsConfirmingOrder(false)
+    }
+  }
+
   const handleRefresh = () => {
     loadPortfolioData()
-    loadCashBalance()
+    loadAccounts()
     loadOrderHistory()
+    loadTransactionHistory()
     toast({
       title: "Refreshed",
       description: "Portfolio data has been refreshed",
@@ -178,7 +330,7 @@ export default function PortfolioPage() {
       {/* Summary Cards */}
       <PortfolioSummaryCard
         totalValue={portfolioData.totalValue}
-        cashBalance={portfolioData.cashBalance}
+        cashBalance={accountsData.totalCash}
         totalGainLoss={portfolioData.totalGainLoss}
         totalGainLossPercent={portfolioData.totalGainLossPercent}
         overallRiskScore={portfolioAnalysis.overallRiskScore}
@@ -188,6 +340,7 @@ export default function PortfolioPage() {
       <Tabs defaultValue="holdings" className="space-y-4">
         <TabsList>
           <TabsTrigger value="holdings">Holdings</TabsTrigger>
+          <TabsTrigger value="accounts">Accounts</TabsTrigger>
           <TabsTrigger value="analysis">Analysis</TabsTrigger>
           <TabsTrigger value="trading">Trading</TabsTrigger>
         </TabsList>
@@ -199,6 +352,72 @@ export default function PortfolioPage() {
             totalValue={portfolioData.totalValue}
             totalGainLoss={portfolioData.totalGainLoss}
             totalGainLossPercent={portfolioData.totalGainLossPercent}
+          />
+        </TabsContent>
+
+        {/* Accounts Tab */}
+        <TabsContent value="accounts" className="space-y-4">
+          {/* Account Summary */}
+          <div className="grid gap-4 md:grid-cols-3">
+            {accountsData.accounts.map((account) => (
+              <Card key={account.accountId}>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center justify-between">
+                    {account.accountName}
+                    {account.isDefault && (
+                      <span className="text-xs font-normal text-muted-foreground">Default</span>
+                    )}
+                  </CardTitle>
+                  <CardDescription className="capitalize">{account.accountType}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-2xl font-bold">
+                        ${account.cashBalance.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                    </div>
+                    <div className="flex gap-2 mt-4">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => {
+                          accountsData.setSelectedAccount(account)
+                          setShowDepositDialog(true)
+                        }}
+                      >
+                        <ArrowDownCircle className="h-4 w-4 mr-1" />
+                        Deposit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => {
+                          accountsData.setSelectedAccount(account)
+                          setShowWithdrawDialog(true)
+                        }}
+                      >
+                        <ArrowUpCircle className="h-4 w-4 mr-1" />
+                        Withdraw
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Transaction History */}
+          <TransactionHistoryTable
+            transactions={accountsData.transactions}
+            summary={accountsData.transactionSummary}
+            isLoading={accountsData.isLoadingTransactions}
           />
         </TabsContent>
 
@@ -260,10 +479,19 @@ export default function PortfolioPage() {
             {/* Trade Form */}
             <TradeForm
               userId={userId}
-              cashBalance={portfolioData.cashBalance}
+              accounts={accountsData.accounts}
+              selectedAccountId={accountsData.selectedAccount?.accountId}
+              onAccountChange={(accountId) => {
+                const account = accountsData.getAccountById(accountId)
+                if (account) accountsData.setSelectedAccount(account)
+              }}
+              onOrderPreview={(orderPreview) => {
+                accountsData.setPendingOrder(orderPreview)
+                accountsData.setShowOrderConfirmation(true)
+              }}
               onOrderPlaced={() => {
                 loadOrderHistory()
-                loadCashBalance()
+                loadAccounts()
               }}
             />
 
@@ -278,6 +506,37 @@ export default function PortfolioPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Dialogs */}
+      <DepositDialog
+        open={showDepositDialog}
+        onOpenChange={setShowDepositDialog}
+        accounts={accountsData.accounts}
+        selectedAccountId={accountsData.selectedAccount?.accountId}
+        onDeposit={handleDeposit}
+        isProcessing={accountsData.isProcessingDeposit}
+      />
+
+      <WithdrawDialog
+        open={showWithdrawDialog}
+        onOpenChange={setShowWithdrawDialog}
+        accounts={accountsData.accounts}
+        selectedAccountId={accountsData.selectedAccount?.accountId}
+        onWithdraw={handleWithdraw}
+        isProcessing={accountsData.isProcessingWithdrawal}
+      />
+
+      <OrderConfirmationDialog
+        open={accountsData.showOrderConfirmation}
+        onOpenChange={(open) => {
+          accountsData.setShowOrderConfirmation(open)
+          if (!open) accountsData.setPendingOrder(null)
+        }}
+        orderPreview={accountsData.pendingOrder}
+        onConfirm={handleConfirmOrder}
+        onReject={handleRejectOrder}
+        isProcessing={accountsData.isConfirmingOrder}
+      />
     </div>
   )
 }

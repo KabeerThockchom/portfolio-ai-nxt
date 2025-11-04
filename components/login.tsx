@@ -85,7 +85,7 @@ export default function Login({ onLogin }: LoginProps) {
               <Input
                 id="email"
                 type="email"
-                placeholder="john.doe@ey.com"
+                placeholder="John.Doe@ey.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -117,8 +117,8 @@ export default function Login({ onLogin }: LoginProps) {
 
             <div className="text-center text-sm text-muted-foreground mt-4">
               <p className="font-medium mb-2">Demo Credentials:</p>
-              <p>Email: john.doe@ey.com</p>
-              <p>Password: password123</p>
+              <p>Email: John.Doe@ey.com</p>
+              <p>Password: PortfolioAI@123</p>
             </div>
           </form>
         </CardContent>

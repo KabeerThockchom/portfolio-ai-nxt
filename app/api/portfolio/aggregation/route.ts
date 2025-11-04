@@ -5,6 +5,7 @@ import {
   assetType,
   assetHistory,
   assetSector,
+  userAccounts,
 } from "@/lib/db/schema"
 import { eq, and, desc, sql } from "drizzle-orm"
 import type {
@@ -100,6 +101,14 @@ export async function POST(request: Request) {
 
     const validHoldings = enrichedHoldings.filter((h) => h !== null)
 
+    // Get total cash from all user accounts
+    const accounts = await db
+      .select()
+      .from(userAccounts)
+      .where(eq(userAccounts.userId, userId))
+
+    const totalCash = accounts.reduce((sum, acc) => sum + acc.cashBalance, 0)
+
     // Aggregate by dimension
     let aggregationMap = new Map<string, PortfolioAggregation>()
 
@@ -178,13 +187,36 @@ export async function POST(request: Request) {
       }
     }
 
-    const aggregation = Array.from(aggregationMap.values())
+    let aggregation = Array.from(aggregationMap.values())
+
+    // Add cash to aggregation (only for asset_class dimension)
+    // Only add if Cash doesn't already exist (to avoid duplicates from user_portfolio)
+    if (dimension === "asset_class" && totalCash > 0) {
+      const existingCash = aggregation.find((a) => a.label === "Cash")
+      if (!existingCash) {
+        // No cash in portfolio, add it from accounts
+        aggregation.push({
+          dimension: "asset_class",
+          label: "Cash",
+          totalValue: totalCash,
+          percentageReturn: 0, // Cash has no return
+          count: accounts.length,
+        })
+      }
+      // If Cash already exists from user_portfolio, don't add from accounts (avoid double-counting)
+    }
 
     // Multi-level aggregation for donut charts (asset class -> sectors)
     if (multiLevel && dimension === "asset_class") {
       const multiLevelAgg: PortfolioAggregation[] = []
 
       for (const assetClassAgg of aggregation) {
+        // Skip sector breakdown for cash (cash has no sectors)
+        if (assetClassAgg.label === "Cash") {
+          multiLevelAgg.push(assetClassAgg)
+          continue
+        }
+
         const children: PortfolioAggregation[] = []
 
         // Get all holdings for this asset class
@@ -230,13 +262,23 @@ export async function POST(request: Request) {
       aggregation.push(...multiLevelAgg)
     }
 
-    // Create chart data
+    // Define color mapping for asset classes
+    const assetClassColors: Record<string, string> = {
+      "Cash": "#FFE600",      // EY Yellow for cash
+      "Stock": "#FFFFFF",     // White for stocks
+      "Bond": "#999999",      // Medium gray for bonds
+      "ETF": "#CCCCCC",       // Light gray for ETFs
+      "Mutual Fund": "#666666", // Darker gray for mutual funds
+    }
+
+    // Create chart data with proper colors
     const chartData: DonutChartData = {
       labels: aggregation.map((a) => a.label),
       series:
         metric === "total_value"
           ? aggregation.map((a) => a.totalValue)
           : aggregation.map((a) => a.percentageReturn || 0),
+      colors: aggregation.map((a) => assetClassColors[a.label] || "#B3B3B3"),
     }
 
     const response: PortfolioAggregationResponse = {

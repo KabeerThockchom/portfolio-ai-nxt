@@ -12,6 +12,19 @@ export const users = sqliteTable("users", {
   phoneNumber: text("phone_number", { length: 11 }).notNull().unique(),
 })
 
+// User Accounts table - Multiple accounts per user
+export const userAccounts = sqliteTable("user_accounts", {
+  accountId: integer("account_id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.userId, { onDelete: "cascade" }),
+  accountName: text("account_name", { length: 100 }).notNull(),
+  accountType: text("account_type", { length: 20 }).notNull(), // checking, savings, brokerage
+  cashBalance: real("cash_balance").notNull().default(0),
+  isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull(),
+})
+
 // Asset Type table - Core asset information
 export const assetType = sqliteTable("asset_type", {
   assetId: integer("asset_id").primaryKey(),
@@ -50,14 +63,16 @@ export const userTransactions = sqliteTable("user_transactions", {
   userId: integer("user_id")
     .notNull()
     .references(() => users.userId, { onDelete: "cascade" }),
+  accountId: integer("account_id")
+    .references(() => userAccounts.accountId, { onDelete: "set null" }),
   assetId: integer("asset_id")
-    .notNull()
     .references(() => assetType.assetId, { onDelete: "cascade" }),
-  transType: text("trans_type", { length: 5 }).notNull(), // Buy/Sell
+  transType: text("trans_type", { length: 10 }).notNull(), // BUY/SELL/DEPOSIT/WITHDRAW
   date: text("date").notNull(), // DATE stored as text in SQLite
-  units: real("units").notNull(),
-  pricePerUnit: real("price_per_unit").notNull(),
+  units: real("units"),
+  pricePerUnit: real("price_per_unit"),
   cost: real("cost").notNull(),
+  description: text("description", { length: 200 }),
 })
 
 // Order Book table - Order management
@@ -66,6 +81,8 @@ export const orderBook = sqliteTable("order_book", {
   userId: integer("user_id")
     .notNull()
     .references(() => users.userId, { onDelete: "cascade" }),
+  accountId: integer("account_id")
+    .references(() => userAccounts.accountId, { onDelete: "cascade" }), // Nullable for migration
   assetId: integer("asset_id")
     .notNull()
     .references(() => assetType.assetId, { onDelete: "cascade" }),
@@ -78,7 +95,8 @@ export const orderBook = sqliteTable("order_book", {
   qty: real("qty").notNull(),
   amount: real("amount").notNull(),
   settlementDate: text("settlement_date").notNull(), // DATE stored as text in SQLite
-  orderStatus: text("order_status", { length: 20 }).notNull(), // Placed, Under Review, Cancelled
+  orderStatus: text("order_status", { length: 20 }).notNull(), // Placed, Under Review, Cancelled, Executed
+  confirmationStatus: text("confirmation_status", { length: 25 }).notNull().default("pending_confirmation"), // pending_confirmation, confirmed, rejected
   orderDate: text("order_date").notNull(), // TIMESTAMP stored as text in SQLite
 })
 
@@ -135,7 +153,17 @@ export const assetClassRiskLevelMapping = sqliteTable("asset_class_risk_level_ma
 
 // Define relations
 export const usersRelations = relations(users, ({ many }) => ({
+  accounts: many(userAccounts),
   portfolio: many(userPortfolio),
+  transactions: many(userTransactions),
+  orders: many(orderBook),
+}))
+
+export const userAccountsRelations = relations(userAccounts, ({ one, many }) => ({
+  user: one(users, {
+    fields: [userAccounts.userId],
+    references: [users.userId],
+  }),
   transactions: many(userTransactions),
   orders: many(orderBook),
 }))
@@ -165,6 +193,10 @@ export const userTransactionsRelations = relations(userTransactions, ({ one }) =
     fields: [userTransactions.userId],
     references: [users.userId],
   }),
+  account: one(userAccounts, {
+    fields: [userTransactions.accountId],
+    references: [userAccounts.accountId],
+  }),
   asset: one(assetType, {
     fields: [userTransactions.assetId],
     references: [assetType.assetId],
@@ -175,6 +207,10 @@ export const orderBookRelations = relations(orderBook, ({ one }) => ({
   user: one(users, {
     fields: [orderBook.userId],
     references: [users.userId],
+  }),
+  account: one(userAccounts, {
+    fields: [orderBook.accountId],
+    references: [userAccounts.accountId],
   }),
   asset: one(assetType, {
     fields: [orderBook.assetId],

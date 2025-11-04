@@ -15,18 +15,31 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { usePortfolioApi } from "@/hooks/use-portfolio-api"
-import type { PlaceOrderRequest } from "@/types/portfolio"
+import { AccountSelector } from "./account-selector"
+import type { PlaceOrderRequest, Account, OrderPreview } from "@/types/portfolio"
+import { DollarSign, TrendingUp, AlertTriangle } from "lucide-react"
 
 interface TradeFormProps {
   userId: number
-  cashBalance: number
+  accounts: Account[]
+  selectedAccountId?: number
+  onAccountChange?: (accountId: number) => void
+  onOrderPreview?: (orderPreview: OrderPreview) => void
   onOrderPlaced?: () => void
 }
 
-export function TradeForm({ userId, cashBalance, onOrderPlaced }: TradeFormProps) {
+export function TradeForm({
+  userId,
+  accounts,
+  selectedAccountId: initialAccountId,
+  onAccountChange,
+  onOrderPreview,
+  onOrderPlaced,
+}: TradeFormProps) {
   const { toast } = useToast()
   const { placeOrder } = usePortfolioApi()
 
+  const [accountId, setAccountId] = useState<number | undefined>(initialAccountId)
   const [symbol, setSymbol] = useState("")
   const [buySell, setBuySell] = useState<"Buy" | "Sell">("Buy")
   const [orderType, setOrderType] = useState<"Market Open" | "Limit">("Market Open")
@@ -34,8 +47,27 @@ export function TradeForm({ userId, cashBalance, onOrderPlaced }: TradeFormProps
   const [price, setPrice] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const selectedAccount = accounts.find((acc) => acc.accountId === accountId)
+  const accountBalance = selectedAccount?.cashBalance || 0
+
+  const handleAccountChange = (newAccountId: number) => {
+    setAccountId(newAccountId)
+    if (onAccountChange) {
+      onAccountChange(newAccountId)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!accountId) {
+      toast({
+        title: "Validation Error",
+        description: "Please select an account",
+        variant: "destructive",
+      })
+      return
+    }
 
     if (!symbol || !qty) {
       toast({
@@ -81,6 +113,7 @@ export function TradeForm({ userId, cashBalance, onOrderPlaced }: TradeFormProps
     try {
       const request: PlaceOrderRequest = {
         userId,
+        accountId,
         symbol: symbol.toUpperCase(),
         buySell,
         orderType,
@@ -90,21 +123,16 @@ export function TradeForm({ userId, cashBalance, onOrderPlaced }: TradeFormProps
 
       const result = await placeOrder(request)
 
-      if (result.success) {
-        toast({
-          title: "Order Placed",
-          description: result.data?.message || "Your order has been placed successfully",
-        })
+      if (result.success && result.data?.orderPreview) {
+        // Show order preview dialog instead of placing immediately
+        if (onOrderPreview) {
+          onOrderPreview(result.data.orderPreview)
+        }
 
         // Reset form
         setSymbol("")
         setQty("")
         setPrice("")
-
-        // Notify parent component
-        if (onOrderPlaced) {
-          onOrderPlaced()
-        }
       } else {
         toast({
           title: "Order Failed",
@@ -123,19 +151,46 @@ export function TradeForm({ userId, cashBalance, onOrderPlaced }: TradeFormProps
     }
   }
 
+  const estimatedTotal =
+    qty && (orderType === "Market Open" || price)
+      ? (parseFloat(qty) || 0) * (parseFloat(price) || 100)
+      : 0
+
+  const insufficientFunds = buySell === "Buy" && estimatedTotal > accountBalance
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Place Order</CardTitle>
-        <div className="flex items-center gap-2 mt-2">
-          <span className="text-sm text-muted-foreground">Cash Available:</span>
-          <Badge variant="outline" className="font-mono">
-            ${cashBalance.toLocaleString()}
-          </Badge>
-        </div>
+        <CardTitle className="flex items-center gap-2">
+          <TrendingUp className="h-5 w-5" />
+          Place Order
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Account Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="account">Trading Account *</Label>
+            <AccountSelector
+              accounts={accounts}
+              selectedAccountId={accountId}
+              onAccountChange={handleAccountChange}
+              placeholder="Select account for this trade"
+            />
+            {selectedAccount && (
+              <div className="flex items-center gap-2 text-sm">
+                <DollarSign className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">Available:</span>
+                <Badge variant="outline" className="font-mono">
+                  ${accountBalance.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </Badge>
+              </div>
+            )}
+          </div>
+
           {/* Symbol */}
           <div className="space-y-2">
             <Label htmlFor="symbol">Symbol *</Label>
@@ -147,6 +202,7 @@ export function TradeForm({ userId, cashBalance, onOrderPlaced }: TradeFormProps
               className="uppercase"
               maxLength={10}
               required
+              disabled={!accountId}
             />
           </div>
 
@@ -214,18 +270,32 @@ export function TradeForm({ userId, cashBalance, onOrderPlaced }: TradeFormProps
           )}
 
           {/* Estimated Total */}
-          {qty && (orderType === "Market Open" || price) && (
-            <div className="p-3 bg-muted rounded-md">
+          {estimatedTotal > 0 && (
+            <div className={`p-3 rounded-md ${insufficientFunds ? "bg-destructive/15 border border-destructive" : "bg-muted"}`}>
               <p className="text-sm text-muted-foreground">Estimated Total</p>
               <p className="text-lg font-bold">
-                ${((parseFloat(qty) || 0) * (parseFloat(price) || 100)).toLocaleString()}
+                ${estimatedTotal.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </p>
+              {insufficientFunds && (
+                <div className="flex items-center gap-1 mt-2 text-sm text-destructive">
+                  <AlertTriangle className="h-3 w-3" />
+                  <span>Insufficient funds (need ${(estimatedTotal - accountBalance).toLocaleString()})</span>
+                </div>
+              )}
             </div>
           )}
 
           {/* Submit Button */}
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? "Placing Order..." : `Place ${buySell} Order`}
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={isSubmitting || !accountId || insufficientFunds}
+            variant={buySell === "Buy" ? "default" : "destructive"}
+          >
+            {isSubmitting ? "Preparing Order..." : `Review ${buySell} Order`}
           </Button>
         </form>
       </CardContent>
