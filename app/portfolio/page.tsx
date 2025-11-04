@@ -123,7 +123,7 @@ export default function PortfolioPage() {
     }
   }
 
-  const loadAggregation = async (dimension: string, metric: string) => {
+  const loadAggregation = async (dimension: string, metric: string, multiLevel?: boolean) => {
     portfolioAnalysis.setIsLoadingAggregation(true)
 
     try {
@@ -131,6 +131,7 @@ export default function PortfolioPage() {
         userId,
         dimension: dimension as any,
         metric: metric as any,
+        multiLevel,
       })
 
       if (result.success && result.data) {
@@ -444,22 +445,23 @@ export default function PortfolioPage() {
         {/* Analysis Tab */}
         <TabsContent value="analysis" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            {/* Asset Class Distribution */}
+            {/* Asset Class Distribution with Sector Breakdown */}
             <div>
               <Button
-                onClick={() => loadAggregation("asset_class", "total_value")}
+                onClick={() => loadAggregation("asset_class", "total_value", true)}
                 variant="outline"
                 size="sm"
                 className="mb-2"
                 disabled={portfolioAnalysis.isLoadingAggregation}
               >
-                {portfolioAnalysis.isLoadingAggregation ? "Loading..." : "Load Asset Class Distribution"}
+                {portfolioAnalysis.isLoadingAggregation ? "Loading..." : "Load Asset Class & Sector Distribution"}
               </Button>
-              {portfolioAnalysis.aggregationChartData && (
+              {portfolioAnalysis.aggregationChartData && portfolioAnalysis.aggregationData && (
                 <DonutChart
                   data={portfolioAnalysis.aggregationChartData}
+                  aggregationData={portfolioAnalysis.aggregationData}
                   title="Portfolio by Asset Class"
-                  subtitle="Distribution of your investments"
+                  subtitle="Click slices to see sector breakdown"
                 />
               )}
             </div>

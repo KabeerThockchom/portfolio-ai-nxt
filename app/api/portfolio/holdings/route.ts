@@ -3,6 +3,7 @@ import { db } from "@/lib/db/connection"
 import { userPortfolio, assetType } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
 import type { PortfolioHolding, PortfolioHoldingsResponse } from "@/types/portfolio"
+import { batchedParallel } from "@/lib/rate-limiter"
 
 export async function GET(request: Request) {
   try {
@@ -16,6 +17,11 @@ export async function GET(request: Request) {
       )
     }
 
+    // Get the base URL from the request to handle dynamic ports in development
+    const protocol = request.headers.get('x-forwarded-proto') || 'http'
+    const host = request.headers.get('host') || 'localhost:3000'
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || `${protocol}://${host}`
+
     // Get all portfolio holdings for the user
     const holdings = await db
       .select()
@@ -24,8 +30,10 @@ export async function GET(request: Request) {
       .leftJoin(assetType, eq(userPortfolio.assetId, assetType.assetId))
 
     // Enrich holdings with latest prices and calculate current values
-    const enrichedHoldings: PortfolioHolding[] = await Promise.all(
-      holdings.map(async (holding) => {
+    // Use rate-limited batching to respect API limits (max 10 calls/second)
+    const enrichedHoldings: PortfolioHolding[] = await batchedParallel(
+      holdings,
+      async (holding) => {
         const { user_portfolio, asset_type } = holding
 
         if (!asset_type) {
@@ -47,7 +55,6 @@ export async function GET(request: Request) {
         } else {
           // Get real-time price from Yahoo Finance API for other assets
           try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
             const quoteResponse = await fetch(`${baseUrl}/api/stock/quote?symbol=${asset_type.assetTicker}`)
 
             // Check if response is OK before parsing
@@ -84,7 +91,9 @@ export async function GET(request: Request) {
           gainLoss,
           gainLossPercent,
         } as PortfolioHolding
-      })
+      },
+      8, // Process 8 items in parallel per batch
+      1000 // Wait 1 second between batches
     )
 
     // Calculate totals

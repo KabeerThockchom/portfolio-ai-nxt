@@ -28,6 +28,11 @@ export async function POST(request: Request) {
       )
     }
 
+    // Get the base URL from the request to handle dynamic ports in development
+    const protocol = request.headers.get('x-forwarded-proto') || 'http'
+    const host = request.headers.get('host') || 'localhost:3000'
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || `${protocol}://${host}`
+
     // Get all portfolio holdings with asset details
     const holdings = await db
       .select()
@@ -43,8 +48,8 @@ export async function POST(request: Request) {
       holdings.map(async ({ user_portfolio, asset_type }) => {
         if (!asset_type) return null
 
-        // Fetch real-time price using price service
-        const latestClosePrice = await getCurrentPrice(asset_type.assetTicker)
+        // Fetch real-time price using price service (with baseUrl for dynamic ports)
+        const latestClosePrice = await getCurrentPrice(asset_type.assetTicker, baseUrl)
         const currentAmount = user_portfolio.assetTotalUnits * latestClosePrice
 
         // Calculate risk score based on volatility and asset class

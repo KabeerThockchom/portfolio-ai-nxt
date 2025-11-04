@@ -110,9 +110,10 @@ export async function getHistoricalPrices(
 /**
  * Get current price for a symbol (real-time, with rate limiting)
  * @param symbol Stock ticker symbol
+ * @param baseUrl Optional base URL for API calls (useful in development with dynamic ports)
  * @returns Current price
  */
-export async function getCurrentPrice(symbol: string): Promise<number> {
+export async function getCurrentPrice(symbol: string, baseUrl?: string): Promise<number> {
   try {
     // Special case for CASH
     if (symbol === "CASH") {
@@ -121,8 +122,8 @@ export async function getCurrentPrice(symbol: string): Promise<number> {
 
     // Use rate limiter to ensure we don't exceed 10 req/sec
     return await rateLimitedFetch(async () => {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
-      const quoteResponse = await fetch(`${baseUrl}/api/stock/quote?symbol=${symbol}`)
+      const apiBase = baseUrl || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+      const quoteResponse = await fetch(`${apiBase}/api/stock/quote?symbol=${symbol}`)
 
       if (!quoteResponse.ok) {
         console.warn(`Quote API returned ${quoteResponse.status} for ${symbol}`)
