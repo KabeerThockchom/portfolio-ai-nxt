@@ -4,11 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Portfolio Assistant is a voice-enabled AI web application for financial insights and stock analysis. It's built with Next.js 15+ (App Router) using React 19, TypeScript, and Tailwind CSS. The application integrates Azure OpenAI's real-time API (model: `gpt-realtime`) for voice interaction via WebRTC and fetches stock data from Yahoo Finance via RapidAPI.
+EY Prometheus is a voice-enabled AI web application for financial insights, stock analysis, and portfolio management. It's built with Next.js 15+ (App Router) using React 19, TypeScript, and Tailwind CSS. The application integrates Azure OpenAI's real-time API (model: `gpt-realtime`) for voice interaction via WebRTC and fetches stock data from Yahoo Finance via RapidAPI.
 
 **Key Features:**
 - Real-time voice interaction with Azure OpenAI
 - 11 different content types: charts, profiles, statistics, analysis, recommendation trends, earnings calendar, trending tickers, insider transactions, balance sheets, income statements, and cash flow statements
+- **Portfolio Management System** (NEW):
+  - Portfolio holdings tracking with real-time valuations
+  - Order management (place, track, cancel orders)
+  - Portfolio aggregation by asset class, sector, ticker, manager
+  - Risk analysis with bubble charts and gauge visualizations
+  - Benchmark comparison against SPX, VTSAX, VBTLX
+  - Returns attribution waterfall charts
+  - Relative performance analysis
+  - SQLite database with Drizzle ORM
 - Conversation persistence with markdown-based storage
 - Modular architecture with custom hooks and centralized type system
 - Interactive financial visualizations using ApexCharts
@@ -63,10 +72,23 @@ This is a unified Next.js application with:
 ```
 app/
 ├── api/              # Server-side API routes
-│   ├── conversation/ # Conversation persistence (NEW)
+│   ├── conversation/ # Conversation persistence
 │   │   ├── save/     # Saves conversation messages to markdown
 │   │   ├── load/     # Loads conversation history (last 30 messages)
 │   │   └── clear/    # Clears conversation history
+│   ├── portfolio/    # Portfolio management APIs (NEW)
+│   │   ├── holdings/ # User portfolio holdings with valuations
+│   │   ├── aggregation/ # Portfolio distribution analysis
+│   │   ├── risk/     # Risk analysis and scoring
+│   │   ├── benchmark/ # Benchmark performance comparison
+│   │   ├── attribution/ # Returns attribution analysis
+│   │   └── relative-performance/ # Relative performance vs benchmarks
+│   ├── orders/       # Order management APIs (NEW)
+│   │   ├── place/    # Place buy/sell orders
+│   │   ├── history/  # Order history and status
+│   │   └── cancel/   # Cancel pending orders
+│   ├── user/         # User-specific data (NEW)
+│   │   └── cash-balance/ # Cash balance and total portfolio value
 │   ├── keys/         # Exposes RapidAPI key to client
 │   ├── session/      # Creates Azure AI voice sessions
 │   ├── market/       # Market-level data requests
@@ -78,10 +100,12 @@ app/
 │       ├── analysis/ # Fetches analyst analysis and recommendations
 │       ├── recommendation-trend/ # Fetches historical recommendation trends
 │       ├── earnings-calendar/ # Fetches earnings calendar events
-│       ├── insider-transactions/ # Fetches insider trading data (NEW)
-│       └── financials/ # Fetches financial statements (NEW)
+│       ├── insider-transactions/ # Fetches insider trading data
+│       └── financials/ # Fetches financial statements
 ├── layout.tsx        # Root layout with ThemeProvider
-└── page.tsx          # Main UI component (orchestrates state and events)
+├── page.tsx          # Main UI component (orchestrates state and events)
+└── portfolio/        # Portfolio management pages (NEW)
+    └── page.tsx      # Portfolio dashboard (planned)
 
 components/
 ├── ui/               # Shadcn UI components (53 total, including custom)
@@ -89,6 +113,15 @@ components/
 │   ├── auto-awesome-icon.tsx # Custom animated icon
 │   ├── typewriter-badges.tsx # Animated example prompts
 │   └── [50+ other Shadcn components]
+├── portfolio/        # Portfolio management components (NEW)
+│   ├── donut-chart.tsx # Multi-level donut charts for aggregation
+│   ├── bubble-chart.tsx # Risk analysis bubble charts (planned)
+│   ├── benchmark-chart.tsx # Benchmark comparison charts (planned)
+│   ├── gauge-chart.tsx # Risk score gauge (planned)
+│   ├── holdings-table.tsx # Portfolio holdings table
+│   ├── portfolio-summary-card.tsx # Portfolio summary metrics
+│   ├── trade-form.tsx # Order placement form (planned)
+│   └── order-history-table.tsx # Order history table (planned)
 ├── stock-chart.tsx   # ApexCharts wrapper for stock visualization
 ├── stock-info-panel.tsx # Stock details sidebar
 ├── stock-profile-card.tsx # Company profile display
@@ -97,25 +130,32 @@ components/
 ├── stock-recommendation-trend-card.tsx # Historical recommendation trends
 ├── stock-earnings-calendar-card.tsx # Earnings events calendar
 ├── trending-tickers-card.tsx # Trending stocks grid
-├── stock-insider-transactions-card.tsx # Insider trading display (NEW)
-├── stock-balance-sheet-card.tsx # Balance sheet visualization (NEW)
-├── stock-income-statement-card.tsx # Income statement display (NEW)
-├── stock-cash-flow-card.tsx # Cash flow statement display (NEW)
-├── tool-calls-panel.tsx # Function call tracking UI (NEW)
-├── api-call-details.tsx # API call metadata display (NEW)
+├── stock-insider-transactions-card.tsx # Insider trading display
+├── stock-balance-sheet-card.tsx # Balance sheet visualization
+├── stock-income-statement-card.tsx # Income statement display
+├── stock-cash-flow-card.tsx # Cash flow statement display
+├── tool-calls-panel.tsx # Function call tracking UI
+├── api-call-details.tsx # API call metadata display
 ├── theme-toggle.tsx  # Dark/light mode switcher
 └── theme-provider.tsx
 
 lib/
+├── db/              # Database layer (NEW)
+│   ├── schema.ts    # Drizzle ORM schema definitions (10 tables)
+│   └── connection.ts # SQLite database connection
 ├── webrtc-helpers.ts # WebRTC utility functions
-├── voice-tools-config.ts # AI function definitions (NEW)
-├── constants.ts      # Example prompts and constants (NEW)
+├── voice-tools-config.ts # AI function definitions
+├── constants.ts      # Example prompts and constants
 └── utils.ts          # Utility functions
 
-hooks/               # Custom React hooks (9 total - NEW)
+hooks/               # Custom React hooks (13 total)
 ├── use-voice-session.ts # Voice/WebRTC state management
 ├── use-stock-data.ts # Stock data state (11 data types)
 ├── use-stock-api.ts  # API fetch functions (centralized)
+├── use-portfolio-data.ts # Portfolio holdings state (NEW)
+├── use-portfolio-analysis.ts # Portfolio analysis state (NEW)
+├── use-portfolio-api.ts # Portfolio API fetch functions (NEW)
+├── use-orders.ts    # Order management state (NEW)
 ├── use-content-history.ts # Navigation history management
 ├── use-conversation.ts # Conversation state & persistence
 ├── use-function-calls.ts # AI function call tracking
@@ -123,15 +163,17 @@ hooks/               # Custom React hooks (9 total - NEW)
 ├── use-mobile.tsx    # Mobile detection
 └── use-toast.ts      # Toast notifications
 
-types/               # Centralized type definitions (NEW)
+types/               # Centralized type definitions
 ├── api.ts           # API response types
 ├── chart.ts         # Chart data types
 ├── function-calls.ts # Function call types
 ├── history.ts       # History item types
 ├── voice-session.ts # Voice session types
+├── portfolio.ts     # Portfolio types (NEW)
 └── index.ts         # Barrel export
 
-data/                # Runtime data storage (NEW)
+data/                # Runtime data storage
+├── portfolio.sqlite3 # Portfolio database (31,400+ price records) (NEW)
 └── session_history.md # Conversation history storage
 ```
 
@@ -775,17 +817,226 @@ Edit system instructions in `app/api/session/route.ts` (around line 33+). The AI
 - `zod` - Schema validation
 - `react-hook-form` - Form handling
 
+**Database:**
+- `better-sqlite3` - SQLite database access
+- `drizzle-orm` - TypeScript ORM with full type safety
+
+## Portfolio Management System
+
+The application includes a complete portfolio management system integrated from `PortfolioAIEY/`. This system provides holdings tracking, risk analysis, benchmarking, order management, and comprehensive portfolio analytics.
+
+### Database Architecture
+
+**SQLite Database**: `data/portfolio.sqlite3` (992KB, 31,400+ historical price records)
+
+**10 Tables:**
+1. **`users`** - User accounts with phone-based authentication
+2. **`asset_type`** - Asset universe (stocks, bonds, ETFs, cash, mutual funds)
+3. **`user_portfolio`** - Portfolio holdings with units and cost basis (5 holdings)
+4. **`user_transactions`** - Transaction history of all trades (56 records)
+5. **`order_book`** - Order management (placed, pending, cancelled, executed) (3 orders)
+6. **`asset_history`** - Historical daily prices (31,400+ records for accurate analysis)
+7. **`asset_sector`** - Sector breakdowns for each asset
+8. **`default_benchmarks`** - Default benchmarks (SPX, VTSAX, VBTLX)
+9. **`relative_benchmarks`** - Per-asset benchmark mappings
+10. **`asset_class_risk_level_mapping`** - Risk scoring rules based on volatility
+
+**ORM**: Uses Drizzle ORM (`lib/db/schema.ts`) with full TypeScript type safety and relationships.
+
+### Portfolio API Routes
+
+**10 Portfolio Management Routes:**
+
+1. **`/api/portfolio/holdings`** (GET)
+   - Fetches user's portfolio holdings with real-time valuations
+   - Returns: holdings array, total value, total gain/loss, gain/loss %
+   - Joins asset data, fetches latest prices from `asset_history`
+
+2. **`/api/portfolio/aggregation`** (POST)
+   - Aggregates portfolio by: asset_class, sector, ticker, asset_manager, category, concentration
+   - Supports multi-level aggregation (e.g., asset_class → sectors)
+   - Returns: aggregation array, donut chart data
+
+3. **`/api/portfolio/risk`** (POST)
+   - Analyzes portfolio risk using volatility and concentration metrics
+   - Risk score: 0-10 scale (0-2: Low, 2-4: Moderate, 4-6: Medium, 6-8: High, 8-10: Very High)
+   - Returns: risk analysis by dimension, overall risk score, bubble chart data, gauge chart data
+
+4. **`/api/portfolio/benchmark`** (POST)
+   - Compares portfolio against SPX, VTSAX, VBTLX
+   - Time periods: weekly, monthly, quarterly, yearly
+   - History: 1-5 years
+   - Returns: indexed performance, periodic returns, chart data
+
+5. **`/api/portfolio/attribution`** (POST)
+   - Returns attribution waterfall showing contribution by dimension
+   - Dimensions: asset_class, sector, ticker
+   - Returns: attribution array, total return, waterfall chart data
+
+6. **`/api/portfolio/relative-performance`** (POST)
+   - Compares each holding against its relative benchmark
+   - Periods: 1w, 1m, 3m, 6m, 1y, 2y, 3y, 5y
+   - Returns: performance comparison for each holding
+
+7. **`/api/user/cash-balance`** (GET)
+   - Returns cash balance and total portfolio value
+   - Used for order validation
+
+8. **`/api/orders/place`** (POST)
+   - Places buy/sell orders (Market Open or Limit)
+   - Validates cash balance for buys
+   - Returns: order confirmation with settlement date (T+2)
+
+9. **`/api/orders/history`** (GET)
+   - Fetches all orders sorted by date (newest first)
+   - Returns: orders array with full details
+
+10. **`/api/orders/cancel`** (POST)
+    - Cancels pending orders (status: Placed or Under Review)
+    - Cannot cancel executed or already cancelled orders
+
+### Portfolio Components
+
+**Chart Components** (`components/portfolio/`):
+- **`donut-chart.tsx`** - Multi-level donut charts for portfolio aggregation
+- **`bubble-chart.tsx`** - 3D bubble charts for risk visualization (size = risk score)
+- **`gauge-chart.tsx`** - Radial gauge for overall risk score (0-10)
+- **`benchmark-chart.tsx`** - Line chart comparing portfolio vs benchmark performance
+- **`waterfall-chart.tsx`** - Returns attribution showing positive/negative contributions
+
+**UI Components**:
+- **`holdings-table.tsx`** - Portfolio holdings with color-coded gain/loss
+- **`portfolio-summary-card.tsx`** - 4-card dashboard (value, gain/loss, risk, cash)
+- **`trade-form.tsx`** - Order placement with validation
+- **`order-history-table.tsx`** - Order tracking with cancel button
+
+### Portfolio Hooks
+
+**4 Specialized Hooks** (following modular pattern):
+
+1. **`use-portfolio-api.ts`** - Centralized API functions
+   - 10 functions matching all API routes
+   - Consistent error handling
+
+2. **`use-portfolio-data.ts`** - Portfolio holdings state
+   - Holdings, total value, gain/loss, cash balance
+   - Loading states
+
+3. **`use-portfolio-analysis.ts`** - Analysis state
+   - Aggregation, benchmarking, risk, attribution, relative performance
+   - Chart data for all visualizations
+
+4. **`use-orders.ts`** - Order management state
+   - Orders array, placement status
+
+### Voice Integration
+
+**10 New Portfolio Functions** added to `lib/voice-tools-config.ts`:
+- `getPortfolioHoldings()` - View all holdings
+- `getPortfolioAggregation(dimension, metric, multiLevel?)` - Analyze distribution
+- `getPortfolioRisk(dimension?)` - Risk analysis
+- `getPortfolioBenchmark(benchmark, period, history)` - Benchmark comparison
+- `getReturnsAttribution(dimension)` - Returns breakdown
+- `getRelativePerformance(period)` - Holding vs benchmark
+- `getCashBalance()` - Check available cash
+- `placeOrder(symbol, buySell, orderType, qty, price?)` - Place trades
+- `getOrderHistory()` - View order history
+- `cancelOrder(orderId)` - Cancel pending orders
+
+**Voice Assistant Usage:**
+```
+User: "Show me my portfolio"
+AI: [calls getPortfolioHoldings()] "You have 5 holdings worth $125,000..."
+
+User: "What's my risk level?"
+AI: [calls getPortfolioRisk()] "Your overall risk score is 4.2 out of 10, which is Moderate..."
+
+User: "Buy 10 shares of Apple"
+AI: [calls getCashBalance(), then placeOrder()] "I've placed a Market Open order..."
+```
+
+### Portfolio Dashboard
+
+**Page**: `/app/portfolio/page.tsx`
+
+**Features:**
+- Summary cards with key metrics
+- Holdings table with sortable columns
+- Analysis tab with:
+  - Asset class distribution donut chart
+  - Risk score gauge
+  - Risk bubble chart by dimension
+- Trading tab with:
+  - Order placement form
+  - Order history table with cancel functionality
+- Refresh button to reload all data
+
+**Usage:**
+```typescript
+// Navigate to portfolio page
+router.push('/portfolio')
+
+// Or access from main app via portfolio functions
+```
+
+### Testing
+
+**Test Script**: `scripts/test-portfolio-api.ts`
+
+Run tests:
+```bash
+npx tsx scripts/test-portfolio-api.ts
+```
+
+Tests all 10 API routes with real database data.
+
+### Key Features
+
+**Holdings Tracking:**
+- Real-time valuations using latest prices from `asset_history`
+- Gain/loss calculations (dollar and percentage)
+- Support for stocks, bonds, ETFs, cash, mutual funds
+
+**Risk Analysis:**
+- Volatility-based scoring (0-10 scale)
+- Concentration analysis
+- Risk breakdown by asset class, sector, ticker
+- Visual risk indicators (bubble charts, gauges)
+
+**Portfolio Analytics:**
+- Multi-dimensional aggregation (6 dimensions)
+- Multi-level breakdowns (e.g., stocks → tech/healthcare sectors)
+- Benchmark performance comparison
+- Returns attribution waterfall
+- Relative performance vs appropriate benchmarks
+
+**Order Management:**
+- Market Open orders (execute at next market open)
+- Limit orders (execute at specified price or better)
+- Order status tracking (Placed, Under Review, Cancelled, Executed)
+- Cash balance validation
+- Order history with filtering
+
+**Data Integrity:**
+- 31,400+ historical price records for accurate analysis
+- T+2 settlement date calculation
+- Foreign key relationships enforce data consistency
+- Drizzle ORM provides type-safe database operations
+
 ## Important Notes
 
 **Architecture:**
 - The app is client-side rendered (`"use client"` in `app/page.tsx`)
-- Modular hooks architecture distributes state across 9 specialized hooks
-- Centralized type system in `/types` directory ensures type safety
+- Modular hooks architecture distributes state across **13 specialized hooks** (9 original + 4 portfolio)
+- Centralized type system in `/types` directory ensures type safety (6 type files)
 - WebRTC helpers check for browser environment to avoid SSR issues
+- SQLite database with Drizzle ORM for portfolio data (10 tables)
 
 **Data & State:**
-- 11 content types supported: charts, profiles, statistics, analysis, recommendations, earnings, trending, insider transactions, balance sheets, income statements, cash flows
+- **Stock Analysis**: 11 content types (charts, profiles, statistics, analysis, recommendations, earnings, trending, insider transactions, balance sheets, income statements, cash flows)
+- **Portfolio Management**: Holdings, aggregation, risk analysis, benchmarking, orders (NEW)
 - Conversation history persisted to `/data/session_history.md` (last 30 messages)
+- Portfolio data persisted to `/data/portfolio.sqlite3` (31,400+ price records)
 - Function calls tracked in memory for transparency (not persisted)
 - Content history supports navigation with swipe gestures and animations
 
@@ -799,8 +1050,9 @@ Edit system instructions in `app/api/session/route.ts` (around line 33+). The AI
 - Voice sessions use Azure OpenAI's `gpt-realtime` model
 - Endpoint: `voiceaistudio9329552017.openai.azure.com`
 - New session created each time user activates assistant (sessions are ephemeral)
-- 11 AI functions available for stock data retrieval
+- **21 AI functions available**: 11 stock data + 10 portfolio management
 - All function calls logged and displayed in Tool Calls Panel
+- Portfolio functions support: holdings, risk, benchmarking, aggregation, orders
 
 **Stock Data:**
 - All stock data from Yahoo Finance via RapidAPI

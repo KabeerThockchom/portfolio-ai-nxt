@@ -16,8 +16,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 4%;
 
-    --primary: 245 58% 61%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 54 100% 50%;
+    --primary-foreground: 0 0% 20%;
 
     --secondary: 0 0% 90%;
     --secondary-foreground: 0 0% 4%;
@@ -33,7 +33,7 @@
 
     --border: 0 0% 90%;
     --input: 0 0% 90%;
-    --ring: 245 58% 61%;
+    --ring: 54 100% 50%;
 
     --radius: 0.5rem;
   }
@@ -49,8 +49,8 @@
     --popover: 0 0% 9%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 245 58% 61%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 54 100% 50%;
+    --primary-foreground: 0 0% 20%;
 
     --secondary: 0 0% 15%;
     --secondary-foreground: 0 0% 98%;
@@ -66,7 +66,7 @@
 
     --border: 0 0% 15%;
     --input: 0 0% 15%;
-    --ring: 245 58% 61%;
+    --ring: 54 100% 50%;
   }
 }
 
@@ -179,10 +179,10 @@
 /* Help button glow animation */
 @keyframes help-glow {
   0%, 100% {
-    box-shadow: 0 0 5px rgba(71, 190, 251, 0.5), 0 0 10px rgba(71, 190, 251, 0.3);
+    box-shadow: 0 0 5px rgba(255, 230, 0, 0.5), 0 0 10px rgba(255, 230, 0, 0.3);
   }
   50% {
-    box-shadow: 0 0 20px rgba(71, 190, 251, 0.8), 0 0 30px rgba(71, 190, 251, 0.5), 0 0 40px rgba(71, 190, 251, 0.3);
+    box-shadow: 0 0 20px rgba(255, 230, 0, 0.8), 0 0 30px rgba(255, 230, 0, 0.5), 0 0 40px rgba(255, 230, 0, 0.3);
   }
 }
 

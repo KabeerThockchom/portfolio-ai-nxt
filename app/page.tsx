@@ -24,7 +24,16 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import TypewriterBadges from "@/components/ui/typewriter-badges"
 import AudioSphereVisualizer from "@/components/ui/audio-sphere-visualizer"
 import ReactMarkdown from "react-markdown"
-import { ApiCallMetadata } from "@/types"
+import { ApiCallMetadata, UserSession } from "@/types"
+import { usePortfolioApi } from "@/hooks/use-portfolio-api"
+import { voiceAssistantTools } from "@/lib/voice-tools-config"
+import Login from "@/components/login"
+
+// Portfolio components
+import { DonutChart } from "@/components/portfolio/donut-chart"
+import { BubbleChart } from "@/components/portfolio/bubble-chart"
+import { GaugeChart } from "@/components/portfolio/gauge-chart"
+import { HoldingsTable } from "@/components/portfolio/holdings-table"
 
 // Define types for chartData
 interface ChartMeta {
@@ -73,7 +82,7 @@ type RtcHelpersModule = typeof import('@/lib/webrtc-helpers');
 
 // Interface for history items - supports chart, profile, and statistics
 interface HistoryItem {
-  type: "chart" | "profile" | "statistics" | "analysis" | "recommendation-trend" | "earnings-calendar" | "trending-tickers" | "insider-transactions" | "balance-sheet" | "income-statement" | "cash-flow";
+  type: "chart" | "profile" | "statistics" | "analysis" | "recommendation-trend" | "earnings-calendar" | "trending-tickers" | "insider-transactions" | "balance-sheet" | "income-statement" | "cash-flow" | "portfolio-holdings" | "portfolio-aggregation" | "portfolio-risk";
   symbol: string;
   // API call metadata
   apiCallDetails?: ApiCallMetadata;
@@ -103,6 +112,10 @@ interface HistoryItem {
   balanceSheetData?: any;
   incomeStatementData?: any;
   cashFlowData?: any;
+  // Portfolio-specific data
+  portfolioHoldingsData?: any;
+  portfolioAggregationData?: any;
+  portfolioRiskData?: any;
 }
 
 const examplePrompts = [
@@ -158,6 +171,11 @@ export default function Home() {
   const [cashFlowDataState, setCashFlowDataState] = useState<any | null>(null)
   const [cashFlowSymbol, setCashFlowSymbol] = useState<string>("")
 
+  // Portfolio state
+  const [portfolioHoldingsData, setPortfolioHoldingsData] = useState<any | null>(null)
+  const [portfolioAggregationData, setPortfolioAggregationData] = useState<any | null>(null)
+  const [portfolioRiskData, setPortfolioRiskData] = useState<any | null>(null)
+
   // API metadata state
   const [chartApiDetails, setChartApiDetails] = useState<ApiCallMetadata | undefined>(undefined)
   const [profileApiDetails, setProfileApiDetails] = useState<ApiCallMetadata | undefined>(undefined)
@@ -178,6 +196,9 @@ export default function Home() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
   const [showHelpGlow, setShowHelpGlow] = useState(false);
+
+  // Portfolio API hook
+  const portfolioApi = usePortfolioApi()
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
   const dataChannelRef = useRef<RTCDataChannel | null>(null)
@@ -201,6 +222,10 @@ export default function Home() {
   // Touch handling for swipe gestures
   const touchStartXRef = useRef<number | null>(null);
   const mainContentRef = useRef<HTMLDivElement>(null);
+
+  // Authentication state
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [userSession, setUserSession] = useState<UserSession | null>(null)
 
   // Add a ref to track the last message content for deduplication
   const lastMessageRef = useRef<string>("");
@@ -245,6 +270,22 @@ export default function Home() {
     }
   }, []);
 
+  // Check for existing session in localStorage on mount
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user")
+    if (storedUser) {
+      try {
+        const parsedUser: UserSession = JSON.parse(storedUser)
+        setUserSession(parsedUser)
+        setIsLoggedIn(true)
+        console.log("Restored user session:", parsedUser.data.name)
+      } catch (error) {
+        console.error("Failed to parse stored user session:", error)
+        localStorage.removeItem("user")
+      }
+    }
+  }, []);
+
   // Auto-scroll transcript to bottom when new messages arrive
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
@@ -262,6 +303,31 @@ export default function Home() {
       setShowHelpGlow(false);
     }
   };
+
+  // Handle user login
+  const onLogin = useCallback((sessionData: UserSession) => {
+    if (sessionData && sessionData.data.user_id) {
+      setUserSession(sessionData)
+      setIsLoggedIn(true)
+      console.log("User logged in:", sessionData.data.name)
+      toast({
+        title: "Welcome!",
+        description: `Logged in as ${sessionData.data.name}`,
+      })
+    }
+  }, [toast])
+
+  // Handle user logout
+  const onLogout = useCallback(() => {
+    setIsLoggedIn(false)
+    setUserSession(null)
+    localStorage.removeItem("user")
+    console.log("User logged out")
+    toast({
+      title: "Logged out",
+      description: "You have been logged out successfully",
+    })
+  }, [toast])
 
   const fetchApiKeys = async () => {
     try {
@@ -487,7 +553,10 @@ export default function Home() {
   const handleFunctionCall = useCallback(async (msg: any, dataChannel: RTCDataChannel) => {
     try {
       const args = JSON.parse(msg.arguments)
-      let apiResponse: ApiStockChartResponse | { success: false, error: string } | undefined;
+      let apiResponse: Record<string, any> & { success?: boolean; error?: string } = {
+        success: false,
+        error: "Function not implemented"
+      };
 
       if (msg.name === "getStockChart") {
         setIsLoading(true)
@@ -1045,6 +1114,305 @@ export default function Home() {
           setCashFlowDataState(null)
         }
         setIsLoading(false)
+      } else if (msg.name === "getPortfolioHoldings") {
+        // Fetch portfolio holdings
+        const userId = args.userId || 1
+        apiResponse = await portfolioApi.fetchPortfolioHoldings(userId)
+
+        if (apiResponse.success && apiResponse.data) {
+          // Clear all other content first
+          setChartData(null)
+          setProfileData(null)
+          setStatisticsData(null)
+          setAnalysisData(null)
+          setRecommendationTrendData(null)
+          setEarningsCalendarData(null)
+          setTrendingTickersData(null)
+          setInsiderTransactionsData(null)
+          setBalanceSheetData(null)
+          setIncomeStatementDataState(null)
+          setCashFlowDataState(null)
+          setPortfolioAggregationData(null)
+          setPortfolioRiskData(null)
+
+          const newPortfolioHoldingsData = apiResponse.data
+          setPortfolioHoldingsData(newPortfolioHoldingsData)
+
+          // Add to history
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "portfolio-holdings",
+              symbol: "Portfolio", // Portfolio doesn't have a single symbol
+              portfolioHoldingsData: newPortfolioHoldingsData,
+            }
+            const updatedHistory = [...prevHistory, newEntry]
+            setCurrentHistoryIndex(updatedHistory.length - 1)
+            return updatedHistory
+          })
+
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150)
+
+          toast({
+            title: "Portfolio Loaded",
+            description: `Found ${apiResponse.data.holdings.length} holdings worth ${apiResponse.data.totalValue.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}`
+          })
+        }
+      } else if (msg.name === "getPortfolioAggregation") {
+        // Analyze portfolio distribution
+        const userId = args.userId || 1
+        apiResponse = await portfolioApi.fetchPortfolioAggregation({
+          userId,
+          dimension: args.dimension,
+          metric: args.metric,
+          multiLevel: args.multiLevel
+        })
+
+        if (apiResponse.success && apiResponse.data) {
+          // Clear all other content first
+          setChartData(null)
+          setProfileData(null)
+          setStatisticsData(null)
+          setAnalysisData(null)
+          setRecommendationTrendData(null)
+          setEarningsCalendarData(null)
+          setTrendingTickersData(null)
+          setInsiderTransactionsData(null)
+          setBalanceSheetData(null)
+          setIncomeStatementDataState(null)
+          setCashFlowDataState(null)
+          setPortfolioHoldingsData(null)
+          setPortfolioRiskData(null)
+
+          const newPortfolioAggregationData = apiResponse.data
+          setPortfolioAggregationData(newPortfolioAggregationData)
+
+          // Add to history
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "portfolio-aggregation",
+              symbol: "Portfolio",
+              portfolioAggregationData: newPortfolioAggregationData,
+            }
+            const updatedHistory = [...prevHistory, newEntry]
+            setCurrentHistoryIndex(updatedHistory.length - 1)
+            return updatedHistory
+          })
+
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150)
+
+          toast({
+            title: "Portfolio Analysis",
+            description: `Analyzed portfolio by ${args.dimension}`
+          })
+        }
+      } else if (msg.name === "getPortfolioRisk") {
+        // Analyze portfolio risk
+        const userId = args.userId || 1
+        apiResponse = await portfolioApi.fetchPortfolioRisk({
+          userId,
+          dimension: args.dimension
+        })
+
+        if (apiResponse.success && apiResponse.data) {
+          // Clear all other content first
+          setChartData(null)
+          setProfileData(null)
+          setStatisticsData(null)
+          setAnalysisData(null)
+          setRecommendationTrendData(null)
+          setEarningsCalendarData(null)
+          setTrendingTickersData(null)
+          setInsiderTransactionsData(null)
+          setBalanceSheetData(null)
+          setIncomeStatementDataState(null)
+          setCashFlowDataState(null)
+          setPortfolioHoldingsData(null)
+          setPortfolioAggregationData(null)
+
+          const newPortfolioRiskData = apiResponse.data
+          setPortfolioRiskData(newPortfolioRiskData)
+
+          // Add to history
+          setContentHistory(prevHistory => {
+            const newEntry: HistoryItem = {
+              type: "portfolio-risk",
+              symbol: "Portfolio",
+              portfolioRiskData: newPortfolioRiskData,
+            }
+            const updatedHistory = [...prevHistory, newEntry]
+            setCurrentHistoryIndex(updatedHistory.length - 1)
+            return updatedHistory
+          })
+
+          setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150)
+
+          toast({
+            title: "Risk Analysis",
+            description: `Overall risk score: ${apiResponse.data.overallRiskScore.toFixed(1)} / 10`
+          })
+        }
+      } else if (msg.name === "getPortfolioBenchmark") {
+        // Compare portfolio against benchmark
+        const userId = args.userId || 1
+        apiResponse = await portfolioApi.fetchPortfolioBenchmark({
+          userId,
+          benchmark: args.benchmark,
+          period: args.period,
+          history: args.history
+        })
+
+        if (apiResponse.success) {
+          toast({
+            title: "Benchmark Comparison",
+            description: `Compared portfolio against ${args.benchmark}`
+          })
+        }
+      } else if (msg.name === "getReturnsAttribution") {
+        // Returns attribution analysis
+        const userId = args.userId || 1
+        apiResponse = await portfolioApi.fetchReturnsAttribution({
+          userId,
+          dimension: args.dimension
+        })
+
+        if (apiResponse.success) {
+          toast({
+            title: "Returns Attribution",
+            description: `Total return: ${apiResponse.data?.totalReturn.toFixed(2)}%`
+          })
+        }
+      } else if (msg.name === "getRelativePerformance") {
+        // Relative performance analysis
+        const userId = args.userId || 1
+        apiResponse = await portfolioApi.fetchRelativePerformance({
+          userId,
+          period: args.period
+        })
+
+        if (apiResponse.success) {
+          toast({
+            title: "Relative Performance",
+            description: `Analyzed ${apiResponse.data?.performance.length} holdings`
+          })
+        }
+      } else if (msg.name === "getCashBalance") {
+        // Get cash balance
+        const userId = args.userId || 1
+        apiResponse = await portfolioApi.fetchCashBalance(userId)
+
+        if (apiResponse.success) {
+          toast({
+            title: "Cash Balance",
+            description: `Available: ${apiResponse.data?.cashBalance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}`
+          })
+        }
+      } else if (msg.name === "placeOrder") {
+        // Place buy/sell order
+        const userId = args.userId || 1
+        apiResponse = await portfolioApi.placeOrder({
+          userId,
+          symbol: args.symbol,
+          buySell: args.buySell,
+          orderType: args.orderType,
+          qty: args.qty,
+          price: args.price
+        })
+
+        if (apiResponse.success) {
+          toast({
+            title: "Order Placed",
+            description: apiResponse.data?.message || "Order placed successfully"
+          })
+        } else {
+          toast({
+            title: "Order Failed",
+            description: apiResponse.error || "Failed to place order",
+            variant: "destructive"
+          })
+        }
+      } else if (msg.name === "getOrderHistory") {
+        // Get order history
+        const userId = args.userId || 1
+        apiResponse = await portfolioApi.fetchOrderHistory(userId)
+
+        if (apiResponse.success) {
+          toast({
+            title: "Order History",
+            description: `Found ${apiResponse.data?.orders.length} orders`
+          })
+        }
+      } else if (msg.name === "cancelOrder") {
+        // Cancel order
+        const userId = args.userId || 1
+        apiResponse = await portfolioApi.cancelOrder(userId, args.orderId)
+
+        if (apiResponse.success) {
+          toast({
+            title: "Order Cancelled",
+            description: apiResponse.data?.message || "Order cancelled successfully"
+          })
+        } else {
+          toast({
+            title: "Cancellation Failed",
+            description: apiResponse.error || "Failed to cancel order",
+            variant: "destructive"
+          })
+        }
+      } else if (msg.name === "authenticateUser") {
+        // Voice-based authentication
+        const phone = args.phonenumber
+        const dob = args.date_of_birth
+
+        try {
+          const response = await fetch(
+            `/api/auth/voice-login?phone=${encodeURIComponent(phone)}&dob=${encodeURIComponent(dob)}`
+          )
+
+          if (response.ok) {
+            const sessionData: UserSession = await response.json()
+
+            // Store in localStorage
+            localStorage.setItem("user", JSON.stringify(sessionData))
+
+            // Update state
+            setUserSession(sessionData)
+            setIsLoggedIn(true)
+
+            toast({
+              title: "Welcome back!",
+              description: `Logged in as ${sessionData.data.name}`,
+            })
+
+            apiResponse = {
+              success: true,
+              message: `You're authenticated, ${sessionData.data.name}. Here's your portfolio on screen.`,
+              data: sessionData.data
+            }
+          } else {
+            const errorData = await response.json()
+            apiResponse = {
+              success: false,
+              error: errorData.message || "Authentication failed"
+            }
+
+            toast({
+              title: "Authentication Failed",
+              description: errorData.message || "Please check your phone number and date of birth",
+              variant: "destructive"
+            })
+          }
+        } catch (error) {
+          apiResponse = {
+            success: false,
+            error: "Failed to authenticate user"
+          }
+
+          toast({
+            title: "Error",
+            description: "An error occurred during authentication",
+            variant: "destructive"
+          })
+        }
       } else if (msg.name === "muteAssistant") {
         // Allow the assistant to end the conversation
         stopAssistant();
@@ -1086,193 +1454,14 @@ export default function Home() {
          dataChannelRef.current.send(JSON.stringify({ type: "response.create" }))
       }
     }
-  }, [toast, fetchStockChart, fetchStockProfile, fetchStockStatistics, fetchStockAnalysis, fetchStockRecommendationTrend, fetchEarningsCalendar, fetchTrendingTickers, fetchInsiderTransactions, fetchFinancials, stopAssistant]);
+  }, [toast, fetchStockChart, fetchStockProfile, fetchStockStatistics, fetchStockAnalysis, fetchStockRecommendationTrend, fetchEarningsCalendar, fetchTrendingTickers, fetchInsiderTransactions, fetchFinancials, portfolioApi, stopAssistant]);
 
   const configureDataChannel = useCallback((dataChannel: RTCDataChannel) => {
     const event = {
       type: "session.update",
       session: {
         modalities: ["text", "audio"],
-        tools: [
-          // Tools configuration as before
-          {
-            type: "function",
-            name: "getStockChart",
-            description: "Fetches chart data for a given stock symbol",
-            parameters: {
-              type: "object",
-              properties: {
-                symbol: { type: "string", description: "Stock symbol (e.g., GOOG, AAPL)" },
-                region: { type: "string", description: "Region code (e.g., US)" },
-                comparisons: { type: "string", description: "Comma-separated list of symbols for comparison" },
-                range: {
-                  type: "string",
-                  description: "Time range (e.g., 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd)",
-                },
-                interval: {
-                  type: "string",
-                  description: "Time interval (e.g., 1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo)",
-                },
-                events: {
-                  type: "string",
-                  description: "Comma-separated list of events: capitalGain, div, split, earn, history",
-                },
-              },
-              required: ["symbol"],
-            },
-          },
-          {
-            type: "function",
-            name: "getStockProfile",
-            description: "Fetches company profile information for a given stock symbol",
-            parameters: {
-              type: "object",
-              properties: {
-                symbol: { type: "string", description: "Stock symbol (e.g., GOOG, AAPL)" },
-                region: { type: "string", description: "Region code (e.g., US)" },
-              },
-              required: ["symbol"],
-            },
-          },
-          {
-            type: "function",
-            name: "getStockStatistics",
-            description: "Fetches key statistics for a given stock symbol",
-            parameters: {
-              type: "object",
-              properties: {
-                symbol: { type: "string", description: "Stock symbol (e.g., GOOG, AAPL)" },
-                region: { type: "string", description: "Region code (e.g., US)" },
-              },
-              required: ["symbol"],
-            },
-          },
-          {
-            type: "function",
-            name: "getStockAnalysis",
-            description: "Fetches comprehensive analyst analysis including recommendations, earnings estimates, price targets, and upgrade/downgrade history for a stock",
-            parameters: {
-              type: "object",
-              properties: {
-                symbol: { type: "string", description: "Stock symbol (e.g., GOOG, AAPL)" },
-                region: { type: "string", description: "Region code (e.g., US)" },
-              },
-              required: ["symbol"],
-            },
-          },
-          {
-            type: "function",
-            name: "getStockRecommendationTrend",
-            description: "Fetches historical analyst recommendation trends showing how Buy/Hold/Sell ratings have changed over time (current, 1 month ago, 2 months ago, 3 months ago)",
-            parameters: {
-              type: "object",
-              properties: {
-                symbol: { type: "string", description: "Stock symbol (e.g., GOOG, AAPL)" },
-                region: { type: "string", description: "Region code (e.g., US)" },
-              },
-              required: ["symbol"],
-            },
-          },
-          {
-            type: "function",
-            name: "getEarningsCalendar",
-            description: "Fetches earnings calendar showing upcoming and recent earnings events. Intelligently interprets user requests like 'next week', 'this month', 'upcoming earnings' and converts them to specific date ranges. Shows company names, tickers, earnings dates/times, EPS estimates, actual EPS, and surprise percentages.",
-            parameters: {
-              type: "object",
-              properties: {
-                period1: { type: "string", description: "Start date in YYYY-MM-DD format (e.g., 2024-10-01). Interpret user intent: 'next week' = today to +7 days, 'this month' = first day to last day of current month, 'upcoming' = today to +14 days" },
-                period2: { type: "string", description: "End date in YYYY-MM-DD format (e.g., 2024-10-31). Should be after period1." },
-                region: { type: "string", description: "Region code (default: US). Options: US, GB, AU, etc." },
-                size: { type: "number", description: "Number of events to return (default: 100, max: 250)" },
-                offset: { type: "number", description: "Pagination offset (default: 0)" },
-                sortField: { type: "string", description: "Field to sort by (default: startdatetime). Options: startdatetime, companyshortname" },
-                sortType: { type: "string", description: "Sort order (default: ASC). Options: ASC, DESC" },
-              },
-              required: [],
-            },
-          },
-          {
-            type: "function",
-            name: "getTrendingTickers",
-            description: "Fetches currently trending stock tickers in the market. Shows stocks with high trading activity, significant price movements, and high investor interest. Displays price, change percentage, market state, and trending score for each ticker. Great for discovering what's hot in the market right now.",
-            parameters: {
-              type: "object",
-              properties: {
-                region: { type: "string", description: "Region code (default: US). Options: US, GB, AU, IN, etc." },
-                lang: { type: "string", description: "Language code (default: en-US)" },
-              },
-              required: [],
-            },
-          },
-          {
-            type: "function",
-            name: "getInsiderTransactions",
-            description: "Fetches insider transaction data for a given stock symbol, showing purchases, sales, and grants by company executives, directors, and major shareholders. Includes transaction dates, insider names/roles, number of shares, transaction values, and net buying/selling activity over the past 6 months. Use this to understand insider sentiment and confidence in the company.",
-            parameters: {
-              type: "object",
-              properties: {
-                symbol: { type: "string", description: "Stock symbol (e.g., AAPL, TSLA, MSFT)" },
-                region: { type: "string", description: "Region code (default: US)" },
-                lang: { type: "string", description: "Language code (default: en-US)" },
-              },
-              required: ["symbol"],
-            },
-          },
-          {
-            type: "function",
-            name: "getBalanceSheet",
-            description: "Fetches balance sheet data for a given stock symbol, showing assets, liabilities, and shareholders' equity over time. Displays both annual and quarterly data with trends. Use this to understand a company's financial position and health.",
-            parameters: {
-              type: "object",
-              properties: {
-                symbol: { type: "string", description: "Stock symbol (e.g., AAPL, TSLA, MSFT)" },
-                region: { type: "string", description: "Region code (default: US)" },
-                lang: { type: "string", description: "Language code (default: en-US)" },
-              },
-              required: ["symbol"],
-            },
-          },
-          {
-            type: "function",
-            name: "getIncomeStatement",
-            description: "Fetches income statement data for a given stock symbol, showing revenue, expenses, and profitability over time. Displays both annual and quarterly data with trends for net income and profit margins. Use this to understand a company's profitability and operational performance.",
-            parameters: {
-              type: "object",
-              properties: {
-                symbol: { type: "string", description: "Stock symbol (e.g., AAPL, TSLA, MSFT)" },
-                region: { type: "string", description: "Region code (default: US)" },
-                lang: { type: "string", description: "Language code (default: en-US)" },
-              },
-              required: ["symbol"],
-            },
-          },
-          {
-            type: "function",
-            name: "getCashFlow",
-            description: "Fetches cash flow statement data for a given stock symbol, showing operating, investing, and financing cash flows over time. Displays both annual and quarterly data with trends. Use this to understand how a company generates and uses cash.",
-            parameters: {
-              type: "object",
-              properties: {
-                symbol: { type: "string", description: "Stock symbol (e.g., AAPL, TSLA, MSFT)" },
-                region: { type: "string", description: "Region code (default: US)" },
-                lang: { type: "string", description: "Language code (default: en-US)" },
-              },
-              required: ["symbol"],
-            },
-          },
-          {
-            type: "function",
-            name: "muteAssistant",
-            description: "Allows the assistant to end the current conversation",
-            parameters: {
-              type: "object",
-              properties: {
-                message: { type: "string", description: "Optional message explaining why the conversation is ending" },
-              },
-              required: [],
-            },
-          },
-        ],
+        tools: voiceAssistantTools, // Use centralized tools configuration (includes stock + portfolio tools)
         input_audio_transcription: {
           model: "whisper-1"
         },
@@ -1487,6 +1676,9 @@ export default function Home() {
         setBalanceSheetData(null);
         setIncomeStatementDataState(null);
         setCashFlowDataState(null);
+        setPortfolioHoldingsData(null);
+        setPortfolioAggregationData(null);
+        setPortfolioRiskData(null);
 
         // Second timeout: Restore new states after clearing has rendered
         setTimeout(() => {
@@ -1538,6 +1730,12 @@ export default function Home() {
             setCashFlowDataState(historyItem.cashFlowData);
             setCashFlowSymbol(historyItem.symbol);
             setCashFlowApiDetails(historyItem.apiCallDetails);
+          } else if (historyItem.type === "portfolio-holdings") {
+            setPortfolioHoldingsData(historyItem.portfolioHoldingsData);
+          } else if (historyItem.type === "portfolio-aggregation") {
+            setPortfolioAggregationData(historyItem.portfolioAggregationData);
+          } else if (historyItem.type === "portfolio-risk") {
+            setPortfolioRiskData(historyItem.portfolioRiskData);
           }
 
           setCurrentHistoryIndex(index);
@@ -1611,23 +1809,44 @@ export default function Home() {
     };
   }, []);
 
+  // Show login screen if not authenticated
+  if (!isLoggedIn) {
+    return <Login onLogin={onLogin} />
+  }
+
   return (
     <main className="min-h-screen bg-background flex flex-col overflow-hidden">
       <header className="border-b border-border py-3 px-6 flex justify-between items-center bg-background">
         <div className="flex items-center gap-3">
           <Image
             src="/portfolio_ai_logo.png"
-            alt="Portfolio AI Logo"
+            alt="EY Prometheus Logo"
             width={40}
             height={40}
             className="rounded-md"
           />
           <h1 className="text-xl font-semibold text-foreground">
-            Portfolio AI
+            EY Prometheus
           </h1>
         </div>
 
         <div className="flex items-center gap-2">
+          {/* User info */}
+          {userSession && (
+            <div className="mr-2 text-sm text-muted-foreground">
+              <span className="font-medium">{userSession.data.name}</span>
+            </div>
+          )}
+
+          {/* Logout button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onLogout}
+            className="text-xs"
+          >
+            Logout
+          </Button>
           <Dialog open={isHelpDialogOpen} onOpenChange={handleHelpDialogChange}>
             <DialogTrigger asChild>
               <div className="relative">
@@ -1635,10 +1854,10 @@ export default function Home() {
                   variant="outline"
                   size="icon"
                   aria-label="Help"
-                  style={{ borderColor: '#47befb' }}
+                  style={{ borderColor: '#FFE600' }}
                   className={showHelpGlow ? 'help-button-glow' : ''}
                 >
-                  <HelpCircle className="h-[1.2rem] w-[1.2rem]" style={{ color: '#47befb' }} />
+                  <HelpCircle className="h-[1.2rem] w-[1.2rem]" style={{ color: '#FFE600' }} />
                 </Button>
                 {showHelpGlow && (
                   <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs py-1.5 px-3 rounded-md whitespace-nowrap animate-bounce pointer-events-none">
@@ -1650,9 +1869,9 @@ export default function Home() {
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle className="text-2xl">About Portfolio AI Assistant</DialogTitle>
+                <DialogTitle className="text-2xl">About EY Prometheus Assistant</DialogTitle>
                 <DialogDescription>
-                  Learn what your AI-powered financial assistant can do
+                  Learn what your AI-powered portfolio assistant can do
                 </DialogDescription>
               </DialogHeader>
 
@@ -1660,7 +1879,7 @@ export default function Home() {
                 <div>
                   <h3 className="text-lg font-semibold mb-2">How It Works</h3>
                   <p className="text-sm text-muted-foreground mb-2">
-                    Portfolio AI is a voice-enabled financial assistant powered by Azure OpenAI's real-time API. Click the microphone sphere to start a voice conversation, or use the example prompts to see what it can do.
+                    EY Prometheus is a voice-enabled portfolio assistant powered by Azure OpenAI's real-time API. Click the microphone sphere to start a voice conversation, or use the example prompts to see what it can do.
                   </p>
                   <p className="text-sm text-muted-foreground">
                     Get instant access to stock data from Yahoo Finance, including charts, company profiles, analyst insights, and trending tickers across global markets. All content is interactive - navigate through history, compare stocks, and click trending tickers to explore.
@@ -1869,7 +2088,7 @@ export default function Home() {
                         text-sm p-3 rounded-lg max-w-[85%]
                         prose prose-sm dark:prose-invert
                         ${message.role === 'user'
-                          ? 'bg-blue-500/20 border border-blue-500/30 text-foreground'
+                          ? 'bg-primary/20 border border-primary/30 text-foreground'
                           : 'bg-background border border-border text-muted-foreground'
                         }
                       `}
@@ -1963,7 +2182,7 @@ export default function Home() {
             {/* Main Content Card - Shows Chart, Profile, Statistics, Analysis, Trending Tickers, or Financial Statements */}
             <div
               className={`transition-all duration-700 ease-out ${
-                showComponents && (chartData || profileData || statisticsData || analysisData || recommendationTrendData || earningsCalendarData || trendingTickersData || insiderTransactionsData || balanceSheetData || incomeStatementDataState || cashFlowDataState)
+                showComponents && (chartData || profileData || statisticsData || analysisData || recommendationTrendData || earningsCalendarData || trendingTickersData || insiderTransactionsData || balanceSheetData || incomeStatementDataState || cashFlowDataState || portfolioHoldingsData || portfolioAggregationData || portfolioRiskData)
                   ? "opacity-100 " +
                     (slideDirection === 'left'
                       ? 'animate-slide-in-from-right'
@@ -2151,8 +2370,61 @@ export default function Home() {
                 <StockCashFlowCard financialsData={cashFlowDataState} symbol={cashFlowSymbol} apiCallDetails={cashFlowApiDetails} />
               )}
 
+              {/* Show Portfolio Aggregation */}
+              {portfolioAggregationData && portfolioAggregationData.chartData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioRiskData && (
+                <Card className="border-border">
+                  <CardContent className="p-6">
+                    <DonutChart
+                      data={portfolioAggregationData.chartData}
+                      title="Portfolio Distribution"
+                      subtitle="Your investments by category"
+                    />
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Show Portfolio Risk */}
+              {portfolioRiskData && portfolioRiskData.chartData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioAggregationData && (
+                <div className="space-y-4">
+                  <Card className="border-border">
+                    <CardContent className="p-6">
+                      <GaugeChart
+                        data={portfolioRiskData.chartData.gaugeData}
+                        title="Portfolio Risk Score"
+                        subtitle={`Overall risk: ${portfolioRiskData.overallRiskScore.toFixed(1)} / 10`}
+                      />
+                    </CardContent>
+                  </Card>
+                  {portfolioRiskData.chartData.bubbleData && portfolioRiskData.chartData.bubbleData.length > 0 && (
+                    <Card className="border-border">
+                      <CardContent className="p-6">
+                        <BubbleChart
+                          data={portfolioRiskData.chartData.bubbleData}
+                          title="Risk Analysis"
+                          subtitle="Risk breakdown by category"
+                        />
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
+
+              {/* Show Portfolio Holdings */}
+              {portfolioHoldingsData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioAggregationData && !portfolioRiskData && (
+                <Card className="border-border">
+                  <CardContent className="p-6">
+                    <HoldingsTable
+                      holdings={portfolioHoldingsData.holdings}
+                      totalValue={portfolioHoldingsData.totalValue}
+                      totalGainLoss={portfolioHoldingsData.totalGainLoss}
+                      totalGainLossPercent={portfolioHoldingsData.totalGainLossPercent}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Show loading or empty state */}
-              {!chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && (
+              {!chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioAggregationData && !portfolioRiskData && (
                 <Card className="border-border">
                   <CardContent className="p-6">
                     {isLoading ? (

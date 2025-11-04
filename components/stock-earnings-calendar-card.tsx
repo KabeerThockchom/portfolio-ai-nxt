@@ -163,8 +163,8 @@ function EarningsEventCard({ event }: { event: any }) {
   const getTimeBadge = () => {
     const type = event.startDateTimeType;
     const badges: Record<string, { label: string; color: string }> = {
-      'BMO': { label: 'Before Market', color: 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20' },
-      'AMC': { label: 'After Market', color: 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20' },
+      'BMO': { label: 'Before Market', color: 'bg-primary/10 text-primary border-primary/20' },
+      'AMC': { label: 'After Market', color: 'bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/20' },
       'TAS': { label: 'Time TBD', color: 'bg-muted-foreground/10 text-muted-foreground border-muted-foreground/20' },
       'TNS': { label: 'Time Not Set', color: 'bg-muted-foreground/10 text-muted-foreground border-muted-foreground/20' },
     };

@@ -299,7 +299,7 @@ export default function StockCashFlowCard({ financialsData, symbol, apiCallDetai
                         </tr>
                         <tr className="border-b border-border hover:bg-muted/30">
                           <td className="py-2 px-3 font-medium flex items-center gap-1">
-                            <ArrowUpCircle className="h-4 w-4 text-blue-500" />
+                            <ArrowUpCircle className="h-4 w-4 text-primary" />
                             Financing Activities
                           </td>
                           {cashFlowData.slice().reverse().map((item: any, index: number) => (

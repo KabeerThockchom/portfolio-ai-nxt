@@ -1,4 +1,4 @@
-# 🎙️ Portfolio AI Assistant
+# 🎙️ EY Prometheus
 
 <div align="center">
 
@@ -8,7 +8,7 @@
 ![Azure OpenAI](https://img.shields.io/badge/Azure_OpenAI-GPT--4-412991?style=for-the-badge&logo=microsoft-azure)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css)
 
-**A voice-enabled AI financial assistant powered by Azure OpenAI's real-time API**
+**Voice-enabled AI portfolio assistant powered by Azure OpenAI. Get real-time portfolio analytics, risk analysis, stock charts, company profiles, analyst insights, and market data.**
 
 [Features](#-features) • [Architecture](#-architecture) • [Getting Started](#-getting-started) • [API Reference](#-api-reference) • [Deployment](#-deployment)
 
@@ -35,7 +35,7 @@
 
 ## Overview
 
-Portfolio AI Assistant is a cutting-edge web application that combines voice interaction with real-time financial data analysis. Built with Next.js 15 and powered by Azure OpenAI's GPT-4 real-time API, it provides an intuitive, hands-free way to explore stock markets, analyze companies, and track market trends.
+EY Prometheus is a cutting-edge web application that combines voice interaction with real-time financial data analysis and portfolio management. Built with Next.js 15 and powered by Azure OpenAI's GPT-4 real-time API, it provides an intuitive, hands-free way to explore stock markets, analyze companies, manage portfolios, and track market trends.
 
 The application leverages **WebRTC** for low-latency voice streaming, **function calling** for dynamic data retrieval, and **ApexCharts** for interactive visualizations—all wrapped in a modern, responsive UI with dark/light theme support.
 

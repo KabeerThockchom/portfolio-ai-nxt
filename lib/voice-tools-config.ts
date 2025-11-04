@@ -168,6 +168,168 @@ export const voiceAssistantTools = [
   },
   {
     type: "function",
+    name: "getPortfolioHoldings",
+    description: "Fetches the user's portfolio holdings with current valuations, gain/loss, and total portfolio value. Shows all assets owned including stocks, bonds, ETFs, and cash positions.",
+    parameters: {
+      type: "object",
+      properties: {
+        userId: { type: "number", description: "User ID (default: 1)" },
+      },
+      required: [],
+    },
+  },
+  {
+    type: "function",
+    name: "getPortfolioAggregation",
+    description: "Analyzes portfolio distribution by different dimensions such as asset class (stocks, bonds, ETFs), sector (Technology, Healthcare, etc.), individual tickers, asset managers, or concentration levels. Can create multi-level breakdowns like asset class → sectors within each class.",
+    parameters: {
+      type: "object",
+      properties: {
+        userId: { type: "number", description: "User ID (default: 1)" },
+        dimension: {
+          type: "string",
+          description: "Dimension to aggregate by: 'asset_class', 'sector', 'ticker', 'asset_manager', 'category', or 'concentration'"
+        },
+        metric: {
+          type: "string",
+          description: "Metric to display: 'total_value' (dollar amounts) or 'percentage_return' (returns)"
+        },
+        multiLevel: {
+          type: "boolean",
+          description: "For asset_class dimension, show nested breakdown by sectors (default: false)"
+        },
+      },
+      required: ["dimension", "metric"],
+    },
+  },
+  {
+    type: "function",
+    name: "getPortfolioRisk",
+    description: "Analyzes portfolio risk by calculating risk scores based on volatility, concentration, and asset class. Shows overall portfolio risk score (0-10 scale) and breakdown by dimension. Risk levels: 0-2 (Low), 2-4 (Moderate), 4-6 (Medium), 6-8 (High), 8-10 (Very High).",
+    parameters: {
+      type: "object",
+      properties: {
+        userId: { type: "number", description: "User ID (default: 1)" },
+        dimension: {
+          type: "string",
+          description: "Dimension to analyze risk by: 'asset_class', 'sector', or 'ticker'. If not provided, defaults to asset_class"
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    type: "function",
+    name: "getPortfolioBenchmark",
+    description: "Compares portfolio performance against market benchmarks like S&P 500 (SPX), Total Stock Market (VTSAX), or Total Bond Market (VBTLX). Shows indexed performance over time and periodic returns to measure outperformance or underperformance.",
+    parameters: {
+      type: "object",
+      properties: {
+        userId: { type: "number", description: "User ID (default: 1)" },
+        benchmark: {
+          type: "string",
+          description: "Benchmark to compare against: 'SPX' (S&P 500), 'VTSAX' (Total Stock), or 'VBTLX' (Total Bond)"
+        },
+        period: {
+          type: "string",
+          description: "Time period for comparison: 'weekly', 'monthly', 'quarterly', or 'yearly'"
+        },
+        history: {
+          type: "number",
+          description: "Years of history to analyze: 1, 2, 3, 4, or 5"
+        },
+      },
+      required: ["benchmark", "period", "history"],
+    },
+  },
+  {
+    type: "function",
+    name: "getReturnsAttribution",
+    description: "Breaks down portfolio returns to show which asset classes, sectors, or individual stocks contributed most (or least) to overall performance. Displays a waterfall chart showing positive and negative contributions adding up to total return.",
+    parameters: {
+      type: "object",
+      properties: {
+        userId: { type: "number", description: "User ID (default: 1)" },
+        dimension: {
+          type: "string",
+          description: "Dimension to attribute returns by: 'asset_class', 'sector', or 'ticker'"
+        },
+      },
+      required: ["dimension"],
+    },
+  },
+  {
+    type: "function",
+    name: "getRelativePerformance",
+    description: "Compares each portfolio holding against its appropriate benchmark. For example, compares tech stocks against Nasdaq, international stocks against MSCI EAFE, etc. Shows which holdings are outperforming or underperforming their peers.",
+    parameters: {
+      type: "object",
+      properties: {
+        userId: { type: "number", description: "User ID (default: 1)" },
+        period: {
+          type: "string",
+          description: "Time period: '1w', '1m', '3m', '6m', '1y', '2y', '3y', or '5y'"
+        },
+      },
+      required: ["period"],
+    },
+  },
+  {
+    type: "function",
+    name: "getCashBalance",
+    description: "Gets the user's available cash balance and total portfolio value. Use this to check if there's enough cash available before placing buy orders.",
+    parameters: {
+      type: "object",
+      properties: {
+        userId: { type: "number", description: "User ID (default: 1)" },
+      },
+      required: [],
+    },
+  },
+  {
+    type: "function",
+    name: "placeOrder",
+    description: "Places a buy or sell order for a stock. Supports Market Open orders (execute at next market open) and Limit orders (execute only at specified price or better). Validates cash balance for buy orders and checks holdings for sell orders.",
+    parameters: {
+      type: "object",
+      properties: {
+        userId: { type: "number", description: "User ID (default: 1)" },
+        symbol: { type: "string", description: "Stock symbol to trade (e.g., AAPL, MSFT)" },
+        buySell: { type: "string", description: "'Buy' or 'Sell'" },
+        orderType: { type: "string", description: "'Market Open' or 'Limit'" },
+        qty: { type: "number", description: "Quantity of shares to trade" },
+        price: { type: "number", description: "Limit price (required for Limit orders, optional for Market Open)" },
+      },
+      required: ["symbol", "buySell", "orderType", "qty"],
+    },
+  },
+  {
+    type: "function",
+    name: "getOrderHistory",
+    description: "Gets the user's order history showing all placed, pending, cancelled, and executed orders with details like order type, symbol, quantity, price, status, and timestamps.",
+    parameters: {
+      type: "object",
+      properties: {
+        userId: { type: "number", description: "User ID (default: 1)" },
+      },
+      required: [],
+    },
+  },
+  {
+    type: "function",
+    name: "cancelOrder",
+    description: "Cancels a pending order. Only orders with status 'Placed' or 'Under Review' can be cancelled. Executed or already cancelled orders cannot be cancelled.",
+    parameters: {
+      type: "object",
+      properties: {
+        userId: { type: "number", description: "User ID (default: 1)" },
+        orderId: { type: "number", description: "Order ID to cancel" },
+      },
+      required: ["orderId"],
+    },
+  },
+  {
+    type: "function",
     name: "muteAssistant",
     description: "Allows the assistant to end the current conversation",
     parameters: {
@@ -176,6 +338,25 @@ export const voiceAssistantTools = [
         message: { type: "string", description: "Optional message explaining why the conversation is ending" },
       },
       required: [],
+    },
+  },
+  {
+    type: "function",
+    name: "authenticateUser",
+    description: "Authenticate user via phone number and date of birth for voice-based login. Use this when user wants to log in or access their portfolio.",
+    parameters: {
+      type: "object",
+      properties: {
+        phonenumber: {
+          type: "string",
+          description: "User's 11-digit phone number (e.g., 12345678901)",
+        },
+        date_of_birth: {
+          type: "string",
+          description: "User's date of birth in YYYY-MM-DD format (e.g., 1990-01-01)",
+        },
+      },
+      required: ["phonenumber", "date_of_birth"],
     },
   },
 ];

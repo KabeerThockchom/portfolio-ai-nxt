@@ -102,8 +102,8 @@ function TickerCard({ ticker, onTickerClick }: { ticker: any; onTickerClick?: (s
     const badges: Record<string, { label: string; color: string }> = {
       'REGULAR': { label: 'Open', color: 'bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/20' },
       'CLOSED': { label: 'Closed', color: 'bg-muted-foreground/10 text-muted-foreground border-muted-foreground/20' },
-      'PRE': { label: 'Pre-Market', color: 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20' },
-      'POST': { label: 'After Hours', color: 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20' },
+      'PRE': { label: 'Pre-Market', color: 'bg-primary/10 text-primary border-primary/20' },
+      'POST': { label: 'After Hours', color: 'bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/20' },
     };
     return badges[marketState] || { label: marketState || 'Unknown', color: 'bg-muted text-muted-foreground' };
   };

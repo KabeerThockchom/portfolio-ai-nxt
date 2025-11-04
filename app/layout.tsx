@@ -11,8 +11,8 @@ const soraFont = localFont({
 })
 
 export const metadata: Metadata = {
-  title: "Portfolio AI - Voice-Enabled Stock Analysis",
-  description: "Voice-enabled AI financial assistant powered by Azure OpenAI. Get real-time stock charts, company profiles, analyst insights, earnings data, and trending tickers from global markets.",
+  title: "EY Prometheus - Voice-Enabled Portfolio Analysis",
+  description: "Voice-enabled AI portfolio assistant powered by Azure OpenAI. Get real-time portfolio analytics, risk analysis, stock charts, company profiles, analyst insights, and market data.",
   generator: 'v0.dev'
 }
 

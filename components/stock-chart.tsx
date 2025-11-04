@@ -108,12 +108,12 @@ export default function StockChart({ chartData, symbol, viewMode = "price" }: St
     const subtitleText = `Current: $${metadata.regularMarketPrice?.toFixed(2)} | ${changeSign}$${change.toFixed(2)} (${changeSign}${changePercent.toFixed(2)}%)`
 
     const isDarkMode = theme === "dark"
-    const textColor = isDarkMode ? "#FAFAFA" : "#0A0A0A"
-    const gridColor = isDarkMode ? "#262626" : "#E5E5E5"
-    const backgroundColor = isDarkMode ? "#0A0A0A" : "#FFFFFF"
-    const primaryColor = "#6366F1"
-    const successColor = "#10B981"
-    const dangerColor = "#EF4444"
+    const textColor = isDarkMode ? "#FFFFFF" : "#333333"
+    const gridColor = isDarkMode ? "#666666" : "#CCCCCC"
+    const backgroundColor = isDarkMode ? "#333333" : "#FFFFFF"
+    const primaryColor = "#FFE600"  // EY Yellow
+    const successColor = "#10B981"  // Keep green
+    const dangerColor = "#EF4444"   // Keep red
 
     const options = {
       series,
@@ -413,10 +413,10 @@ export default function StockChart({ chartData, symbol, viewMode = "price" }: St
       Object.values(result.events.dividends).forEach((dividend: any) => {
         annotations.xaxis.push({
           x: new Date(dividend.date * 1000).getTime(),
-          borderColor: "#6366F1",
+          borderColor: "#FFE600",
           label: {
-            borderColor: "#6366F1",
-            style: { color: "#FFFFFF", background: "#6366F1" },
+            borderColor: "#FFE600",
+            style: { color: "#333333", background: "#FFE600" },
             text: `Dividend: $${dividend.amount}`,
           },
         });
@@ -427,10 +427,10 @@ export default function StockChart({ chartData, symbol, viewMode = "price" }: St
       Object.values(result.events.splits).forEach((split: any) => {
         annotations.xaxis.push({
           x: new Date(split.date * 1000).getTime(),
-          borderColor: "#6366F1",
+          borderColor: "#FFE600",
           label: {
-            borderColor: "#6366F1",
-            style: { color: "#FFFFFF", background: "#6366F1" },
+            borderColor: "#FFE600",
+            style: { color: "#333333", background: "#FFE600" },
             text: `Split: ${split.numerator}:${split.denominator}`,
           },
         });
@@ -441,10 +441,10 @@ export default function StockChart({ chartData, symbol, viewMode = "price" }: St
       Object.values(result.events.earnings).forEach((earning: any) => {
         annotations.xaxis.push({
           x: new Date(earning.date * 1000).getTime(),
-          borderColor: "#6366F1",
+          borderColor: "#FFE600",
           label: {
-            borderColor: "#6366F1",
-            style: { color: "#FFFFFF", background: "#6366F1" },
+            borderColor: "#FFE600",
+            style: { color: "#333333", background: "#FFE600" },
             text: "Earnings",
           },
         });
