@@ -221,22 +221,25 @@ export const voiceAssistantTools = [
   {
     type: "function",
     name: "getPortfolioBenchmark",
-    description: "Compares portfolio performance against market benchmarks like S&P 500 (SPX), Total Stock Market (VTSAX), or Total Bond Market (VBTLX). Shows indexed performance over time and periodic returns to measure outperformance or underperformance.",
+    description: "Compares portfolio performance against market benchmarks like S&P 500 (^GSPC), Total Stock Market (VTSAX), or Total Bond Market (VBTLX). Shows indexed performance over time and periodic returns. IMPORTANT: If the user asks for benchmark comparison without specifying which benchmark, time period, or history, ask them: 'Which benchmark would you like to compare against - S&P 500 (^GSPC), Total Stock Market (VTSAX), or Total Bond Market (VBTLX)? And what time period - weekly, monthly, quarterly, or yearly? How many years of history - 1, 2, 3, 4, or 5?'",
     parameters: {
       type: "object",
       properties: {
         userId: { type: "number", description: "User ID (default: 1)" },
         benchmark: {
           type: "string",
-          description: "Benchmark to compare against: 'SPX' (S&P 500), 'VTSAX' (Total Stock), or 'VBTLX' (Total Bond)"
+          enum: ["^GSPC", "VTSAX", "VBTLX"],
+          description: "Benchmark to compare against: '^GSPC' (S&P 500 index), 'VTSAX' (Vanguard Total Stock Market), or 'VBTLX' (Vanguard Total Bond Market)"
         },
         period: {
           type: "string",
-          description: "Time period for comparison: 'weekly', 'monthly', 'quarterly', or 'yearly'"
+          enum: ["weekly", "monthly", "quarterly", "yearly"],
+          description: "Time period for comparison data points: 'weekly', 'monthly', 'quarterly', or 'yearly'"
         },
         history: {
           type: "number",
-          description: "Years of history to analyze: 1, 2, 3, 4, or 5"
+          enum: [1, 2, 3, 4, 5],
+          description: "Years of historical data to analyze: 1, 2, 3, 4, or 5"
         },
       },
       required: ["benchmark", "period", "history"],

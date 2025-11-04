@@ -42,14 +42,14 @@ export async function rateLimitedBatch<T, R>(
  * Process items in parallel batches with rate limiting
  * @param items - Array of items to process
  * @param processFn - Async function to process each item
- * @param batchSize - Number of items to process in parallel (default: 8)
+ * @param batchSize - Number of items to process in parallel (default: 10)
  * @param delayBetweenBatches - Delay between batches in ms (default: 1000ms)
  * @returns Array of results
  */
 export async function batchedParallel<T, R>(
   items: T[],
   processFn: (item: T) => Promise<R>,
-  batchSize: number = 8,
+  batchSize: number = 10,
   delayBetweenBatches: number = 1000
 ): Promise<R[]> {
   const results: R[] = []

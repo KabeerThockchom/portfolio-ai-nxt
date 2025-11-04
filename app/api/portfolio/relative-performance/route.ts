@@ -79,6 +79,11 @@ export async function POST(request: Request) {
       )
     }
 
+    // Get the base URL from the request to handle dynamic ports in development
+    const protocol = request.headers.get('x-forwarded-proto') || 'http'
+    const host = request.headers.get('host') || 'localhost:3000'
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || `${protocol}://${host}`
+
     const { startDate, endDate } = getDateRange(period)
 
     // Get user's portfolio holdings
@@ -109,7 +114,7 @@ export async function POST(request: Request) {
           .limit(1)
 
         const relativeBenchmark =
-          benchmarks.length > 0 ? benchmarks[0].relativeBenchmark : "SPX"
+          benchmarks.length > 0 ? benchmarks[0].relativeBenchmark : "^GSPC"
 
         benchmarkMap.set(asset_type.assetTicker, relativeBenchmark)
       })
@@ -123,7 +128,8 @@ export async function POST(request: Request) {
         const prices = await getHistoricalPrices(
           asset_type.assetTicker,
           startDateStr,
-          endDateStr
+          endDateStr,
+          baseUrl
         )
         priceMap.set(asset_type.assetTicker, prices)
       })
@@ -136,7 +142,8 @@ export async function POST(request: Request) {
         const prices = await getHistoricalPrices(
           benchmark,
           startDateStr,
-          endDateStr
+          endDateStr,
+          baseUrl
         )
         priceMap.set(benchmark, prices)
       })
@@ -146,7 +153,7 @@ export async function POST(request: Request) {
     const performance = holdings.map(({ user_portfolio, asset_type }) => {
         if (!asset_type) return null
 
-        const relativeBenchmark = benchmarkMap.get(asset_type.assetTicker) || "SPX"
+        const relativeBenchmark = benchmarkMap.get(asset_type.assetTicker) || "^GSPC"
 
         // Get prices from map
         const holdingPrices = priceMap.get(asset_type.assetTicker) || []

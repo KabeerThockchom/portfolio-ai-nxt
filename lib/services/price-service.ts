@@ -50,12 +50,14 @@ async function rateLimitedFetch<T>(fetchFn: () => Promise<T>): Promise<T> {
  * @param symbol Stock ticker symbol
  * @param startDate ISO date string (YYYY-MM-DD)
  * @param endDate ISO date string (YYYY-MM-DD)
+ * @param baseUrl Optional base URL for API calls (useful in development with dynamic ports)
  * @returns Array of historical prices
  */
 export async function getHistoricalPrices(
   symbol: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  baseUrl?: string
 ): Promise<HistoricalPrice[]> {
   try {
     // 1. Check cache for this symbol and date range
@@ -72,7 +74,7 @@ export async function getHistoricalPrices(
 
     // 3. Cache miss or stale - fetch from Yahoo Finance
     console.log(`Cache MISS for ${symbol} (${startDate} to ${endDate}), fetching from API...`)
-    const fetchedPrices = await fetchHistoricalPricesFromAPI(symbol, startDate, endDate)
+    const fetchedPrices = await fetchHistoricalPricesFromAPI(symbol, startDate, endDate, baseUrl)
 
     // 4. Store in cache
     if (fetchedPrices.length > 0) {
@@ -168,17 +170,15 @@ function isCacheFresh(cachedPrices: Array<{ cachedAt: string }>): boolean {
 async function fetchHistoricalPricesFromAPI(
   symbol: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  baseUrl?: string
 ): Promise<HistoricalPrice[]> {
   try {
     // Use rate limiter to ensure we don't exceed 10 req/sec
     return await rateLimitedFetch(async () => {
-      // Convert ISO dates to Unix timestamps
-      const period1 = Math.floor(new Date(startDate).getTime() / 1000)
-      const period2 = Math.floor(new Date(endDate).getTime() / 1000)
-
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
-      const url = `${baseUrl}/api/stock/chart?symbol=${symbol}&region=US&range=max&interval=1d&period1=${period1}&period2=${period2}`
+      // Yahoo Finance API expects dates in YYYY-MM-DD format, not Unix timestamps
+      const apiBase = baseUrl || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+      const url = `${apiBase}/api/stock/chart?symbol=${symbol}&region=US&interval=1d&period1=${startDate}&period2=${endDate}`
 
       console.log(`Fetching historical prices from: ${url}`)
 
@@ -191,12 +191,12 @@ async function fetchHistoricalPricesFromAPI(
 
       const data = await response.json()
 
-      if (!data.success || !data.data?.chart?.result?.[0]) {
+      if (!data.success || !data.chartData?.chart?.result?.[0]) {
         console.error(`No chart data available for ${symbol}`)
         return []
       }
 
-      const result = data.data.chart.result[0]
+      const result = data.chartData.chart.result[0]
       const timestamps = result.timestamp || []
       const closes = result.indicators?.quote?.[0]?.close || []
 
@@ -272,5 +272,30 @@ export async function clearExpiredCache(): Promise<void> {
     console.log(`Cleared cache entries older than ${cutoffTime}`)
   } catch (error) {
     console.error('Error clearing expired cache:', error)
+  }
+}
+
+/**
+ * Clear ALL cache entries (use with caution - clears entire cache)
+ * @param symbol Optional symbol to clear cache for specific ticker (e.g., "SPX")
+ */
+export async function clearAllCache(symbol?: string): Promise<void> {
+  try {
+    if (symbol) {
+      // Clear cache for specific symbol
+      await db
+        .delete(priceCache)
+        .where(eq(priceCache.symbol, symbol))
+
+      console.log(`Cleared all cache entries for ${symbol}`)
+    } else {
+      // Clear all cache
+      await db.delete(priceCache)
+
+      console.log('Cleared ALL cache entries')
+    }
+  } catch (error) {
+    console.error('Error clearing cache:', error)
+    throw error
   }
 }

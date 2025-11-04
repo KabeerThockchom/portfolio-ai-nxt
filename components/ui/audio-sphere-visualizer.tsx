@@ -4,8 +4,9 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 interface AudioSphereVisualizerProps {
   isAssistantListening: boolean;
+  isMuted?: boolean;
   llmAudioElementRef?: React.RefObject<HTMLAudioElement | null>;
-  onStartAssistant: () => Promise<void>; 
+  onStartAssistant: () => Promise<void>;
   onStopAssistant: () => void;
   className?: string;
   canvasClassName?: string;
@@ -25,11 +26,12 @@ const REACTION_THRESHOLD = 15; // Audio level to trigger reaction
 
 const AudioSphereVisualizer: React.FC<AudioSphereVisualizerProps> = ({
   isAssistantListening,
+  isMuted = false,
   llmAudioElementRef,
   onStartAssistant,
   onStopAssistant,
   className = "flex flex-col items-center justify-center",
-  canvasClassName = "w-20 h-20 md:w-24 md:h-24", 
+  canvasClassName = "w-20 h-20 md:w-24 md:h-24",
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [userHasInteracted, setUserHasInteracted] = useState(false);
@@ -354,8 +356,26 @@ const AudioSphereVisualizer: React.FC<AudioSphereVisualizerProps> = ({
   };
 
   return (
-    <div className={className} onClick={handleInteraction} style={{ cursor: 'pointer' }}>
-      <div ref={containerRef} className={canvasClassName}></div>
+    <div className={className} onClick={handleInteraction} style={{ cursor: 'pointer', position: 'relative' }}>
+      <div
+        ref={containerRef}
+        className={canvasClassName}
+        style={{
+          opacity: isMuted ? 0.5 : 1,
+          transition: 'opacity 0.3s ease-in-out'
+        }}
+      ></div>
+      {isMuted && (
+        <div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+          style={{
+            background: 'rgba(0, 0, 0, 0.3)',
+            borderRadius: '50%'
+          }}
+        >
+          <span className="text-white text-xs font-semibold">MUTED</span>
+        </div>
+      )}
     </div>
   );
 };

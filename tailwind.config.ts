@@ -87,12 +87,22 @@ const config = {
           from: { transform: "translateX(-100%)" },
           to: { transform: "translateX(0)" },
         },
+        "spin-slow": {
+          from: { transform: "rotate(0deg)" },
+          to: { transform: "rotate(360deg)" },
+        },
+        "spin-reverse": {
+          from: { transform: "rotate(360deg)" },
+          to: { transform: "rotate(0deg)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "slide-in-from-right": "slide-in-from-right 0.5s ease-out",
         "slide-in-from-left": "slide-in-from-left 0.5s ease-out",
+        "spin-slow": "spin-slow 4s linear infinite",
+        "spin-reverse": "spin-reverse 3s linear infinite",
       },
     },
   },

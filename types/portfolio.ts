@@ -247,7 +247,7 @@ export interface PortfolioAggregationRequest {
 
 export interface BenchmarkRequest {
   userId: number
-  benchmark: "SPX" | "VTSAX" | "VBTLX"
+  benchmark: "^GSPC" | "VTSAX" | "VBTLX"
   period: "weekly" | "monthly" | "quarterly" | "yearly"
   history: 1 | 2 | 3 | 4 | 5 // Years
 }

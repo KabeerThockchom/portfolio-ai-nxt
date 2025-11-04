@@ -72,6 +72,11 @@ export async function POST(request: Request) {
       )
     }
 
+    // Get the base URL from the request to handle dynamic ports in development
+    const protocol = request.headers.get('x-forwarded-proto') || 'http'
+    const host = request.headers.get('host') || 'localhost:3000'
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || `${protocol}://${host}`
+
     // Get benchmark asset ID
     const benchmarkAssets = await db
       .select()
@@ -118,7 +123,8 @@ export async function POST(request: Request) {
         const prices = await getHistoricalPrices(
           asset_type.assetTicker,
           startDateStr,
-          endDateStr
+          endDateStr,
+          baseUrl
         )
         priceMap.set(asset_type.assetTicker, prices)
       })
@@ -128,7 +134,8 @@ export async function POST(request: Request) {
     const benchmarkPrices = await getHistoricalPrices(
       benchmark,
       startDateStr,
-      endDateStr
+      endDateStr,
+      baseUrl
     )
 
     // Calculate portfolio values for each period

@@ -24,6 +24,7 @@ import StockChart from "@/components/stock-chart"
 import { ThemeToggle } from "@/components/theme-toggle"
 import TypewriterBadges from "@/components/ui/typewriter-badges"
 import AudioSphereVisualizer from "@/components/ui/audio-sphere-visualizer"
+import { AtomicLoader } from "@/components/ui/atomic-loader"
 import ReactMarkdown from "react-markdown"
 import { ApiCallMetadata, UserSession } from "@/types"
 import { usePortfolioApi } from "@/hooks/use-portfolio-api"
@@ -39,6 +40,7 @@ import { BenchmarkChart } from "@/components/portfolio/benchmark-chart"
 import { WaterfallChart } from "@/components/portfolio/waterfall-chart"
 import { PriceTrendChart } from "@/components/portfolio/price-trend-chart"
 import { OrderHistoryTable } from "@/components/portfolio/order-history-table"
+import { RelativePerformanceChart } from "@/components/portfolio/relative-performance-chart"
 
 // Define types for chartData
 interface ChartMeta {
@@ -151,6 +153,7 @@ const AutoAwesomeIcon = ({ className = "" }: { className?: string }) => {
 
 export default function Home() {
   const [isListening, setIsListening] = useState(false)
+  const [isMuted, setIsMuted] = useState(false)
   const [rapidApiKey, setRapidApiKey] = useState("")
   const [selectedStock, setSelectedStock] = useState("")
   const [comparisonStocks, setComparisonStocks] = useState<string[]>([])
@@ -216,6 +219,7 @@ export default function Home() {
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
   const dataChannelRef = useRef<RTCDataChannel | null>(null)
   const audioElementRef = useRef<HTMLAudioElement | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
   const [currentChartView, setCurrentChartView] = useState<"price" | "percent" | "relative">("price")
   const [mainStock, setMainStock] = useState("")
 
@@ -559,8 +563,35 @@ export default function Home() {
     if (audioElementRef.current) {
       audioElementRef.current.srcObject = null
     }
+    // Clear media stream ref and reset muted state
+    mediaStreamRef.current = null
+    setIsMuted(false)
     setIsListening(false)
   }, []);
+
+  const toggleMute = useCallback(() => {
+    if (!isListening) return;
+
+    const newMutedState = !isMuted;
+    setIsMuted(newMutedState);
+
+    // Mute/unmute microphone tracks
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => {
+        track.enabled = !newMutedState;
+      });
+    }
+
+    // Mute/unmute system audio output
+    if (audioElementRef.current) {
+      audioElementRef.current.muted = newMutedState;
+    }
+
+    toast({
+      title: newMutedState ? "Muted" : "Unmuted",
+      description: newMutedState ? "Microphone and audio muted" : "Microphone and audio active"
+    });
+  }, [isMuted, isListening, toast]);
 
   // DEFINE handleFunctionCall and configureDataChannel BEFORE startAssistant
   const handleFunctionCall = useCallback(async (msg: any, dataChannel: RTCDataChannel) => {
@@ -1960,6 +1991,7 @@ export default function Home() {
       });
 
       const stream = await rtcHelpers.getUserAudioMedia();
+      mediaStreamRef.current = stream; // Store for mute toggle
       stream.getTracks().forEach((track) => peerConnection.addTransceiver(track, { direction: "sendrecv" }));
 
       const offer = await peerConnection.createOffer();
@@ -2465,15 +2497,30 @@ export default function Home() {
               <div className="p-3 rounded-xl border border-border bg-muted/30">
                 <AudioSphereVisualizer
                   isAssistantListening={isListening}
+                  isMuted={isMuted}
                   llmAudioElementRef={audioElementRef}
                   onStartAssistant={startAssistant}
                   onStopAssistant={stopAssistant}
                   canvasClassName="w-32 h-32 md:w-36 md:h-36 cursor-pointer"
                 />
               </div>
+
+              {/* Mute button - only visible when listening */}
+              {isListening && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={toggleMute}
+                  className="mt-3"
+                  aria-label={isMuted ? "Unmute" : "Mute"}
+                >
+                  {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </Button>
+              )}
+
               <p className="text-xs text-muted-foreground mt-3 text-center">
                 {isListening
-                  ? "Tap to mute"
+                  ? (isMuted ? "Muted - Click button to unmute" : "Active - Click button to mute")
                   : mounted && rtcHelpers
                   ? "Tap to speak"
                   : "Initializing..."}
@@ -2586,6 +2633,11 @@ export default function Home() {
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
+            )}
+
+            {/* Atomic Loader - Shows while waiting for tool call responses */}
+            {isLoading && !showComponents && (
+              <AtomicLoader message="Processing your request..." />
             )}
 
             {/* Main Content Card - Shows Chart, Profile, Statistics, Analysis, Trending Tickers, or Financial Statements */}
@@ -2836,7 +2888,7 @@ export default function Home() {
               {portfolioBenchmarkData && portfolioBenchmarkData.chartData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioAggregationData && !portfolioRiskData && !portfolioAttributionData && !portfolioRelativePerformanceData && !portfolioPriceTrendData && (
                 <BenchmarkChart
                   data={portfolioBenchmarkData.chartData}
-                  benchmarkName={portfolioBenchmarkData.comparison[0]?.benchmarkValue ? "Benchmark" : "SPX"}
+                  benchmarkName={portfolioBenchmarkData.comparison[0]?.benchmarkValue ? "Benchmark" : "S&P 500"}
                   title="Portfolio vs Benchmark"
                   subtitle="Historical performance comparison"
                 />
@@ -2853,29 +2905,11 @@ export default function Home() {
 
               {/* Show Portfolio Relative Performance */}
               {portfolioRelativePerformanceData && portfolioRelativePerformanceData.performance && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioAggregationData && !portfolioRiskData && !portfolioBenchmarkData && !portfolioAttributionData && !portfolioPriceTrendData && (
-                <Card className="border-border">
-                  <CardContent className="p-6">
-                    <h3 className="text-lg font-semibold mb-4">Relative Performance</h3>
-                    <div className="space-y-2">
-                      {portfolioRelativePerformanceData.performance.map((item: any, index: number) => (
-                        <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="font-medium">{item.assetName}</p>
-                            <p className="text-sm text-muted-foreground">vs {item.relativeBenchmark}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className={`font-semibold ${item.outperformance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {item.outperformance >= 0 ? '+' : ''}{item.outperformance.toFixed(2)}%
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {item.portfolioReturn.toFixed(2)}% vs {item.benchmarkReturn.toFixed(2)}%
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                <RelativePerformanceChart
+                  data={portfolioRelativePerformanceData.performance}
+                  title="Relative Performance"
+                  subtitle="Outperformance vs benchmarks"
+                />
               )}
 
               {/* Show Portfolio Price Trends */}

@@ -60,17 +60,32 @@ export function BenchmarkChart({ data, benchmarkName, title, subtitle }: Benchma
     tooltip: {
       shared: true,
       intersect: false,
-      theme: "light",
+      theme: "dark",
       style: {
         fontSize: "12px",
+        fontFamily: "inherit",
       },
-      y: {
-        formatter: function (val: number) {
-          return val.toFixed(2)
-        },
-      },
-      x: {
-        show: true,
+      // Force dark background and white text in both light and dark modes
+      custom: function({ series, seriesIndex, dataPointIndex, w }: any) {
+        const date = w.globals.categoryLabels[dataPointIndex]
+        const portfolio = series[0][dataPointIndex]
+        const benchmark = series[1][dataPointIndex]
+
+        return `
+          <div style="background: #1a1a1a; padding: 10px; border-radius: 4px; color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+            <div style="font-weight: 600; margin-bottom: 6px; border-bottom: 1px solid #333; padding-bottom: 4px;">${date}</div>
+            <div style="display: flex; align-items: center; margin-bottom: 4px;">
+              <span style="display: inline-block; width: 10px; height: 10px; background: #FFE600; border-radius: 50%; margin-right: 8px;"></span>
+              <span style="color: #ccc;">Your Portfolio:</span>
+              <span style="font-weight: 600; margin-left: 8px;">${portfolio.toFixed(2)}</span>
+            </div>
+            <div style="display: flex; align-items: center;">
+              <span style="display: inline-block; width: 10px; height: 10px; background: #CCCCCC; border-radius: 50%; margin-right: 8px;"></span>
+              <span style="color: #ccc;">SPX:</span>
+              <span style="font-weight: 600; margin-left: 8px;">${benchmark.toFixed(2)}</span>
+            </div>
+          </div>
+        `
       },
     },
     legend: {
