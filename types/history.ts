@@ -21,7 +21,9 @@ export type HistoryContentType =
   | "portfolio-benchmark"
   | "portfolio-attribution"
   | "portfolio-relative-performance"
-  | "portfolio-price-trend";
+  | "portfolio-price-trend"
+  | "order-slip"
+  | "order-history";
 
 // Interface for history items - supports chart, profile, and statistics
 export interface HistoryItem {
@@ -58,11 +60,16 @@ export interface HistoryItem {
   // Portfolio-specific data
   portfolioHoldingsData?: any;
   portfolioAggregationData?: any;
+  portfolioAggregationViewMode?: 'donut' | 'bar';
+  portfolioAggregationDrillPath?: string[];
   portfolioRiskData?: any;
   portfolioBenchmarkData?: any;
   portfolioAttributionData?: any;
   portfolioRelativePerformanceData?: any;
   portfolioPriceTrendData?: any;
+  // Order-specific data
+  orderSlipData?: any;
+  orderHistoryData?: any;
 }
 
 export type SlideDirection = 'none' | 'left' | 'right';

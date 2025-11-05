@@ -4,13 +4,16 @@ import {
   userPortfolio,
   assetType,
   assetSector,
+  userAccounts,
 } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
+import { sql } from "drizzle-orm"
 import type {
   PortfolioAggregation,
   PortfolioAggregationRequest,
   PortfolioAggregationResponse,
   DonutChartData,
+  StackedBarChartData,
 } from "@/types/portfolio"
 import { getCurrentPrice } from "@/lib/services/price-service"
 
@@ -186,8 +189,31 @@ export async function POST(request: Request) {
 
     let aggregation = Array.from(aggregationMap.values())
 
-    // Cash is now handled in user_portfolio with special price logic ($1.00 per unit)
-    // No need to add cash from separate accounts table
+    // Add cash from user_accounts table (single source of truth)
+    if (dimension === "asset_class") {
+      // Query total cash balance from all user accounts
+      const accountsResult = await db
+        .select({
+          totalCash: sql<number>`SUM(${userAccounts.cashBalance})`
+        })
+        .from(userAccounts)
+        .where(eq(userAccounts.userId, userId))
+
+      const totalCash = accountsResult[0]?.totalCash || 0
+
+      console.log(`[Aggregation] Total cash from user_accounts: $${totalCash}`)
+
+      // Add cash to aggregation if user has cash balance
+      if (totalCash > 0) {
+        aggregation.push({
+          dimension: "asset_class",
+          label: "Cash",
+          totalValue: totalCash,
+          percentageReturn: 0, // Cash doesn't have returns
+          count: 1,
+        })
+      }
+    }
 
     // Multi-level aggregation for donut charts (asset class -> sectors)
     if (multiLevel && dimension === "asset_class") {
@@ -305,8 +331,8 @@ export async function POST(request: Request) {
       colors = aggregation.map((a, index) => defaultColorPalette[index % defaultColorPalette.length])
     }
 
-    // Create chart data with proper colors
-    const chartData: DonutChartData = {
+    // Create donut chart data with proper colors
+    const donutChartData: DonutChartData = {
       labels: aggregation.map((a) => a.label),
       series:
         metric === "total_value"
@@ -315,11 +341,29 @@ export async function POST(request: Request) {
       colors,
     }
 
+    // Create stacked bar chart data with proper colors
+    const stackedBarChartData: StackedBarChartData = {
+      categories: aggregation.map((a) => a.label),
+      series: [
+        {
+          name: metric === "total_value" ? "Total Value" : "Percentage Return",
+          data:
+            metric === "total_value"
+              ? aggregation.map((a) => a.totalValue)
+              : aggregation.map((a) => a.percentageReturn || 0),
+        },
+      ],
+      colors,
+    }
+
     const response: PortfolioAggregationResponse = {
       success: true,
       data: {
         aggregation,
-        chartData,
+        chartData: {
+          donut: donutChartData,
+          stackedBar: stackedBarChartData,
+        },
       },
     }
 

@@ -237,6 +237,15 @@ export interface GaugeChartData {
   label: string
 }
 
+export interface StackedBarChartData {
+  categories: string[]
+  series: Array<{
+    name: string
+    data: number[]
+  }>
+  colors?: string[]
+}
+
 // API request/response types
 export interface PortfolioAggregationRequest {
   userId: number
@@ -333,7 +342,10 @@ export type PortfolioHoldingsResponse = ApiResponse<{
 
 export type PortfolioAggregationResponse = ApiResponse<{
   aggregation: PortfolioAggregation[]
-  chartData: DonutChartData
+  chartData: {
+    donut: DonutChartData
+    stackedBar: StackedBarChartData
+  }
 }>
 
 export type BenchmarkResponse = ApiResponse<{

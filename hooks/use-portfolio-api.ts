@@ -233,6 +233,16 @@ export function usePortfolioApi() {
     return response.json()
   }
 
+  // Refresh prices for all holdings
+  const refreshPrices = async (userId: number): Promise<{ success: boolean; data?: { message: string; updatedCount: number }; error?: string }> => {
+    const response = await fetch("/api/portfolio/refresh-prices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    })
+    return response.json()
+  }
+
   return {
     fetchPortfolioHoldings,
     fetchPortfolioAggregation,
@@ -254,5 +264,6 @@ export function usePortfolioApi() {
     depositFunds,
     withdrawFunds,
     fetchTransactionHistory,
+    refreshPrices,
   }
 }

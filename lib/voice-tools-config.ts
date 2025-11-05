@@ -181,7 +181,7 @@ export const voiceAssistantTools = [
   {
     type: "function",
     name: "getPortfolioAggregation",
-    description: "Analyzes portfolio distribution by different dimensions such as asset class (stocks, bonds, ETFs), sector (Technology, Healthcare, etc.), individual tickers, asset managers, or concentration levels. Can create multi-level breakdowns like asset class → sectors within each class.",
+    description: "Analyzes portfolio distribution by different dimensions such as asset class (stocks, bonds, ETFs), sector (Technology, Healthcare, etc.), individual tickers, asset managers, or concentration levels. Can create multi-level breakdowns like asset class → sectors within each class. Can display as donut chart or stacked bar chart. Charts are interactive - users can click on any segment to drill down into its breakdown, and use breadcrumb navigation to go back up.",
     parameters: {
       type: "object",
       properties: {
@@ -196,7 +196,11 @@ export const voiceAssistantTools = [
         },
         multiLevel: {
           type: "boolean",
-          description: "For asset_class dimension, show nested breakdown by sectors (default: false)"
+          description: "For asset_class dimension, enable clickable drill-down into sectors (default: true for asset_class, false otherwise)"
+        },
+        chartType: {
+          type: "string",
+          description: "Chart type to display: 'donut' or 'bar' (default: 'donut')"
         },
       },
       required: ["dimension", "metric"],

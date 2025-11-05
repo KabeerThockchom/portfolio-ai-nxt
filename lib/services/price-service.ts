@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/connection"
-import { priceCache } from "@/lib/db/schema"
+import { priceCache, assetHistory, assetType, userPortfolio } from "@/lib/db/schema"
 import { eq, and, gte, lte } from "drizzle-orm"
 
 export interface HistoricalPrice {
@@ -91,20 +91,59 @@ export async function getHistoricalPrices(
 }
 
 /**
- * Get current price for a symbol (real-time, with rate limiting)
+ * Get current price for a symbol with database caching (updated once per day)
  * @param symbol Stock ticker symbol
  * @param baseUrl Optional base URL for API calls (useful in development with dynamic ports)
+ * @param forceRefresh Force fetch from API, bypassing cache
  * @returns Current price
  */
-export async function getCurrentPrice(symbol: string, baseUrl?: string): Promise<number> {
+export async function getCurrentPrice(symbol: string, baseUrl?: string, forceRefresh = false): Promise<number> {
   try {
     // Special case for CASH
     if (symbol === "CASH") {
       return 1.0
     }
 
-    // Use rate limiter to ensure we don't exceed 10 req/sec
-    return await rateLimitedFetch(async () => {
+    const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+
+    // Check cache first (unless forceRefresh is true)
+    if (!forceRefresh) {
+      // Get asset ID from symbol
+      const assetRecord = await db
+        .select()
+        .from(assetType)
+        .where(eq(assetType.assetTicker, symbol))
+        .limit(1)
+
+      if (assetRecord.length > 0) {
+        const assetId = assetRecord[0].assetId
+
+        // Check if we have today's price in asset_history
+        const cachedPrice = await db
+          .select()
+          .from(assetHistory)
+          .where(
+            and(
+              eq(assetHistory.assetId, assetId),
+              eq(assetHistory.date, today)
+            )
+          )
+          .limit(1)
+
+        // If cached and updated today, return cached price
+        if (cachedPrice.length > 0 && cachedPrice[0].updatedAt) {
+          const updatedDate = cachedPrice[0].updatedAt.split('T')[0]
+          if (updatedDate === today) {
+            console.log(`[Cache HIT] ${symbol}: $${cachedPrice[0].closePrice} (updated: ${cachedPrice[0].updatedAt})`)
+            return cachedPrice[0].closePrice
+          }
+        }
+      }
+    }
+
+    // Cache miss or forceRefresh - fetch from API
+    console.log(`[Cache MISS] ${symbol}: fetching from API...`)
+    const price = await rateLimitedFetch(async () => {
       const apiBase = baseUrl || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
       const quoteResponse = await fetch(`${apiBase}/api/stock/quote?symbol=${symbol}`)
 
@@ -122,6 +161,13 @@ export async function getCurrentPrice(symbol: string, baseUrl?: string): Promise
         return 0
       }
     })
+
+    // Update cache with new price
+    if (price > 0) {
+      await updatePriceCache(symbol, today, price)
+    }
+
+    return price
   } catch (error) {
     console.error(`Error fetching current price for ${symbol}:`, error)
     return 0
@@ -296,6 +342,121 @@ export async function clearAllCache(symbol?: string): Promise<void> {
     }
   } catch (error) {
     console.error('Error clearing cache:', error)
+    throw error
+  }
+}
+
+/**
+ * Update price cache in asset_history table
+ * @param symbol Stock ticker symbol
+ * @param date ISO date string (YYYY-MM-DD)
+ * @param price Closing price
+ */
+async function updatePriceCache(symbol: string, date: string, price: number): Promise<void> {
+  try {
+    // Get asset ID from symbol
+    const assetRecord = await db
+      .select()
+      .from(assetType)
+      .where(eq(assetType.assetTicker, symbol))
+      .limit(1)
+
+    if (assetRecord.length === 0) {
+      console.warn(`Asset not found for symbol: ${symbol}`)
+      return
+    }
+
+    const assetId = assetRecord[0].assetId
+    const now = new Date().toISOString()
+
+    // Check if record already exists for this date
+    const existingRecord = await db
+      .select()
+      .from(assetHistory)
+      .where(
+        and(
+          eq(assetHistory.assetId, assetId),
+          eq(assetHistory.date, date)
+        )
+      )
+      .limit(1)
+
+    if (existingRecord.length > 0) {
+      // Update existing record
+      await db
+        .update(assetHistory)
+        .set({
+          closePrice: price,
+          updatedAt: now
+        })
+        .where(eq(assetHistory.assetHistId, existingRecord[0].assetHistId))
+
+      console.log(`[Cache UPDATE] ${symbol}: $${price} (date: ${date})`)
+    } else {
+      // Insert new record
+      await db.insert(assetHistory).values({
+        assetId,
+        date,
+        closePrice: price,
+        updatedAt: now
+      })
+
+      console.log(`[Cache INSERT] ${symbol}: $${price} (date: ${date})`)
+    }
+  } catch (error) {
+    console.error(`Error updating price cache for ${symbol}:`, error)
+    // Don't throw - caching is not critical
+  }
+}
+
+/**
+ * Refresh prices for all holdings in a user's portfolio
+ * @param userId User ID
+ * @param baseUrl Optional base URL for API calls
+ * @returns Number of prices updated
+ */
+export async function refreshAllHoldingsPrices(userId: number, baseUrl?: string): Promise<number> {
+  try {
+    console.log(`[Refresh] Fetching all holdings for user ${userId}...`)
+
+    // Get all holdings with asset details
+    const holdings = await db
+      .select()
+      .from(userPortfolio)
+      .where(eq(userPortfolio.userId, userId))
+      .leftJoin(assetType, eq(userPortfolio.assetId, assetType.assetId))
+
+    const today = new Date().toISOString().split('T')[0]
+    let updatedCount = 0
+
+    console.log(`[Refresh] Found ${holdings.length} holdings to update`)
+
+    // Fetch fresh prices for each holding
+    for (const holding of holdings) {
+      if (!holding.asset_type) continue
+
+      const symbol = holding.asset_type.assetTicker
+
+      // Skip CASH (always $1.00)
+      if (symbol === "CASH") continue
+
+      try {
+        // Force refresh from API
+        const price = await getCurrentPrice(symbol, baseUrl, true)
+
+        if (price > 0) {
+          updatedCount++
+          console.log(`[Refresh] ${symbol}: $${price}`)
+        }
+      } catch (error) {
+        console.error(`[Refresh] Failed to update price for ${symbol}:`, error)
+      }
+    }
+
+    console.log(`[Refresh] Successfully updated ${updatedCount}/${holdings.length} prices`)
+    return updatedCount
+  } catch (error) {
+    console.error('Error refreshing holding prices:', error)
     throw error
   }
 }

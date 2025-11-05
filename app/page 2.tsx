@@ -4,9 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Badge } from "@/components/ui/badge"
-import { Mic, MicOff, BarChart4, Info, ChevronLeft, ChevronRight, Sparkles, HelpCircle, TrendingUp, Users, RefreshCw } from "lucide-react"
+import { Mic, MicOff, BarChart4, Info, ChevronLeft, ChevronRight, Sparkles, HelpCircle, TrendingUp, Users } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import StockInfoPanel from "@/components/stock-info-panel"
 import StockProfileCard from "@/components/stock-profile-card"
@@ -25,7 +24,6 @@ import StockChart from "@/components/stock-chart"
 import { ThemeToggle } from "@/components/theme-toggle"
 import TypewriterBadges from "@/components/ui/typewriter-badges"
 import AudioSphereVisualizer from "@/components/ui/audio-sphere-visualizer"
-import { AtomicLoader } from "@/components/ui/atomic-loader"
 import ReactMarkdown from "react-markdown"
 import { ApiCallMetadata, UserSession } from "@/types"
 import { usePortfolioApi } from "@/hooks/use-portfolio-api"
@@ -34,16 +32,13 @@ import Login from "@/components/login"
 
 // Portfolio components
 import { DonutChart } from "@/components/portfolio/donut-chart"
-import { StackedBarChart } from "@/components/portfolio/stacked-bar-chart"
 import { BubbleChart } from "@/components/portfolio/bubble-chart"
 import { GaugeChart } from "@/components/portfolio/gauge-chart"
 import { HoldingsTable } from "@/components/portfolio/holdings-table"
 import { BenchmarkChart } from "@/components/portfolio/benchmark-chart"
-import { OrderSlipCard } from "@/components/portfolio/order-slip-card"
-import { OrderHistoryTable } from "@/components/portfolio/order-history-table"
 import { WaterfallChart } from "@/components/portfolio/waterfall-chart"
 import { PriceTrendChart } from "@/components/portfolio/price-trend-chart"
-import { RelativePerformanceChart } from "@/components/portfolio/relative-performance-chart"
+import { OrderHistoryTable } from "@/components/portfolio/order-history-table"
 
 // Define types for chartData
 interface ChartMeta {
@@ -156,7 +151,6 @@ const AutoAwesomeIcon = ({ className = "" }: { className?: string }) => {
 
 export default function Home() {
   const [isListening, setIsListening] = useState(false)
-  const [isMuted, setIsMuted] = useState(false)
   const [rapidApiKey, setRapidApiKey] = useState("")
   const [selectedStock, setSelectedStock] = useState("")
   const [comparisonStocks, setComparisonStocks] = useState<string[]>([])
@@ -190,9 +184,6 @@ export default function Home() {
   const [portfolioRelativePerformanceData, setPortfolioRelativePerformanceData] = useState<any | null>(null)
   const [portfolioAttributionData, setPortfolioAttributionData] = useState<any | null>(null)
   const [portfolioPriceTrendData, setPortfolioPriceTrendData] = useState<any | null>(null)
-  const [aggregationViewMode, setAggregationViewMode] = useState<'donut' | 'bar'>('donut')
-  const [cashBalance, setCashBalance] = useState<number>(0)
-  const [isRefreshingPrices, setIsRefreshingPrices] = useState(false)
 
   // Order state
   const [orderHistoryData, setOrderHistoryData] = useState<any | null>(null)
@@ -225,7 +216,6 @@ export default function Home() {
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
   const dataChannelRef = useRef<RTCDataChannel | null>(null)
   const audioElementRef = useRef<HTMLAudioElement | null>(null)
-  const mediaStreamRef = useRef<MediaStream | null>(null)
   const [currentChartView, setCurrentChartView] = useState<"price" | "percent" | "relative">("price")
   const [mainStock, setMainStock] = useState("")
 
@@ -308,44 +298,6 @@ export default function Home() {
       }
     }
   }, []);
-
-  // Auto-load portfolio data on login
-  useEffect(() => {
-    const loadPortfolioData = async () => {
-      if (!userSession?.data.user_id) return
-
-      const userId = userSession.data.user_id
-
-      try {
-        // 1. Check if prices need refresh (new day detection)
-        const today = new Date().toISOString().split('T')[0]
-        const lastRefresh = localStorage.getItem('last-price-refresh')
-
-        if (lastRefresh !== today) {
-          console.log('[Auto-load] New day detected, refreshing prices...')
-          setIsRefreshingPrices(true)
-          const refreshResult = await portfolioApi.refreshPrices(userId)
-          if (refreshResult.success) {
-            localStorage.setItem('last-price-refresh', today)
-            console.log('[Auto-load] Prices refreshed:', refreshResult.data?.message)
-          }
-          setIsRefreshingPrices(false)
-        }
-
-        // 2. Fetch cash balance
-        console.log('[Auto-load] Fetching cash balance...')
-        const cashResponse = await portfolioApi.fetchCashBalance(userId)
-        if (cashResponse.success) {
-          setCashBalance(cashResponse.data?.cashBalance || 0)
-          console.log('[Auto-load] Cash balance loaded:', cashResponse.data?.cashBalance)
-        }
-      } catch (error) {
-        console.error('[Auto-load] Error loading portfolio data:', error)
-      }
-    }
-
-    loadPortfolioData()
-  }, [userSession, portfolioApi])
 
   // Auto-scroll transcript to bottom when new messages arrive
   useEffect(() => {
@@ -607,35 +559,8 @@ export default function Home() {
     if (audioElementRef.current) {
       audioElementRef.current.srcObject = null
     }
-    // Clear media stream ref and reset muted state
-    mediaStreamRef.current = null
-    setIsMuted(false)
     setIsListening(false)
   }, []);
-
-  const toggleMute = useCallback(() => {
-    if (!isListening) return;
-
-    const newMutedState = !isMuted;
-    setIsMuted(newMutedState);
-
-    // Mute/unmute microphone tracks
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => {
-        track.enabled = !newMutedState;
-      });
-    }
-
-    // Mute/unmute system audio output
-    if (audioElementRef.current) {
-      audioElementRef.current.muted = newMutedState;
-    }
-
-    toast({
-      title: newMutedState ? "Muted" : "Unmuted",
-      description: newMutedState ? "Microphone and audio muted" : "Microphone and audio active"
-    });
-  }, [isMuted, isListening, toast]);
 
   // DEFINE handleFunctionCall and configureDataChannel BEFORE startAssistant
   const handleFunctionCall = useCallback(async (msg: any, dataChannel: RTCDataChannel) => {
@@ -1252,25 +1177,11 @@ export default function Home() {
       } else if (msg.name === "getPortfolioAggregation") {
         // Analyze portfolio distribution
         const userId = args.userId || 1
-
-        // Set chart view mode based on chartType parameter
-        if (args.chartType === 'bar') {
-          setAggregationViewMode('bar')
-        } else if (args.chartType === 'donut') {
-          setAggregationViewMode('donut')
-        }
-        // If chartType not specified, keep current view mode
-
-        // Default multiLevel to true for asset_class dimension to enable drill-down
-        const shouldUseMultiLevel = args.multiLevel !== undefined
-          ? args.multiLevel
-          : (args.dimension === 'asset_class')
-
         apiResponse = await portfolioApi.fetchPortfolioAggregation({
           userId,
           dimension: args.dimension,
           metric: args.metric,
-          multiLevel: shouldUseMultiLevel
+          multiLevel: args.multiLevel
         })
 
         if (apiResponse.success && apiResponse.data) {
@@ -1302,7 +1213,6 @@ export default function Home() {
               type: "portfolio-aggregation",
               symbol: "Portfolio",
               portfolioAggregationData: newPortfolioAggregationData,
-              portfolioAggregationViewMode: aggregationViewMode,
             }
             const updatedHistory = [...prevHistory, newEntry]
             setCurrentHistoryIndex(updatedHistory.length - 1)
@@ -1605,8 +1515,7 @@ export default function Home() {
         setPortfolioRelativePerformanceData(null)
         setPortfolioAttributionData(null)
         setPortfolioPriceTrendData(null)
-        setOrderPreviewData(null)
-        setOrderHistoryData(null)
+        // Don't clear orderHistoryData - we want to show it along with preview
 
         apiResponse = await portfolioApi.placeOrder({
           userId,
@@ -1619,34 +1528,21 @@ export default function Home() {
         })
 
         if (apiResponse.success) {
-          // Set the order preview data for immediate display
+          // Save order preview data
           setOrderPreviewData(apiResponse.data)
 
-          // Immediately fetch and set order history (so both display together)
+          // Also fetch and show order history so both display together
           const historyResponse = await portfolioApi.fetchOrderHistory(userId)
           if (historyResponse.success) {
             setOrderHistoryData(historyResponse.data)
           }
 
-          // Add order slip to history (order history will display below it)
-          setContentHistory(prevHistory => {
-            const orderSlipEntry: HistoryItem = {
-              type: "order-slip",
-              symbol: args.symbol,
-              orderSlipData: apiResponse.data?.orderPreview,
-              orderHistoryData: historyResponse.success ? historyResponse.data : undefined,
-            }
-            const updatedHistory = [...prevHistory, orderSlipEntry]
-            setCurrentHistoryIndex(updatedHistory.length - 1)
-            return updatedHistory
-          })
-
           // Show components with animation
           setTimeout(() => requestAnimationFrame(() => setShowComponents(true)), 150)
 
           toast({
-            title: "Order Pending Confirmation",
-            description: `Please confirm or reject order #${apiResponse.data?.orderPreview?.orderId}`
+            title: "Order Placed",
+            description: apiResponse.data?.message || "Order placed successfully"
           })
         } else {
           toast({
@@ -2064,7 +1960,6 @@ export default function Home() {
       });
 
       const stream = await rtcHelpers.getUserAudioMedia();
-      mediaStreamRef.current = stream; // Store for mute toggle
       stream.getTracks().forEach((track) => peerConnection.addTransceiver(track, { direction: "sendrecv" }));
 
       const offer = await peerConnection.createOffer();
@@ -2246,19 +2141,8 @@ export default function Home() {
             setPortfolioHoldingsData(historyItem.portfolioHoldingsData);
           } else if (historyItem.type === "portfolio-aggregation") {
             setPortfolioAggregationData(historyItem.portfolioAggregationData);
-            if (historyItem.portfolioAggregationViewMode) {
-              setAggregationViewMode(historyItem.portfolioAggregationViewMode);
-            }
           } else if (historyItem.type === "portfolio-risk") {
             setPortfolioRiskData(historyItem.portfolioRiskData);
-          } else if (historyItem.type === "order-slip") {
-            setOrderPreviewData(historyItem.orderSlipData);
-            // Also restore order history if it was stored with the slip
-            if (historyItem.orderHistoryData) {
-              setOrderHistoryData(historyItem.orderHistoryData);
-            }
-          } else if (historyItem.type === "order-history") {
-            setOrderHistoryData(historyItem.orderHistoryData);
           }
 
           setCurrentHistoryIndex(index);
@@ -2285,116 +2169,6 @@ export default function Home() {
       navigateToHistory(currentHistoryIndex + 1);
     }
   }, [currentHistoryIndex, contentHistory.length]);
-
-  // Handler for confirming an order
-  const handleConfirmOrder = async (orderId: number) => {
-    try {
-      const response = await portfolioApi.confirmOrder(orderId)
-
-      if (response.success) {
-        // Clear order preview (remove the slip)
-        setOrderPreviewData(null)
-
-        // Refresh order history to show updated status
-        const historyResponse = await portfolioApi.fetchOrderHistory(1)
-        if (historyResponse.success) {
-          setOrderHistoryData(historyResponse.data)
-
-          // Update the history entry
-          setContentHistory(prevHistory => {
-            const updatedHistory = [...prevHistory]
-            const currentItem = updatedHistory[currentHistoryIndex]
-            if (currentItem && currentItem.type === "order-slip") {
-              currentItem.orderSlipData = null
-              currentItem.orderHistoryData = historyResponse.data
-            }
-            return updatedHistory
-          })
-        }
-
-        // Refresh cash balance after order confirmation
-        if (userSession?.data.user_id) {
-          const cashResponse = await portfolioApi.fetchCashBalance(userSession.data.user_id)
-          if (cashResponse.success) {
-            setCashBalance(cashResponse.data?.cashBalance || 0)
-            console.log('[Order Confirm] Cash balance updated:', cashResponse.data?.cashBalance)
-          }
-        }
-
-        toast({
-          title: "Order Confirmed",
-          description: response.data?.message || `Order #${orderId} has been confirmed and will execute at market open`
-        })
-      } else {
-        toast({
-          title: "Confirmation Failed",
-          description: response.error || "Failed to confirm order",
-          variant: "destructive"
-        })
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "An error occurred while confirming the order",
-        variant: "destructive"
-      })
-    }
-  }
-
-  // Handler for rejecting an order
-  const handleRejectOrder = async (orderId: number) => {
-    try {
-      const response = await portfolioApi.rejectOrder(orderId)
-
-      if (response.success) {
-        // Clear order preview (remove the slip)
-        setOrderPreviewData(null)
-
-        // Refresh order history to show updated status
-        const historyResponse = await portfolioApi.fetchOrderHistory(1)
-        if (historyResponse.success) {
-          setOrderHistoryData(historyResponse.data)
-
-          // Update the history entry
-          setContentHistory(prevHistory => {
-            const updatedHistory = [...prevHistory]
-            const currentItem = updatedHistory[currentHistoryIndex]
-            if (currentItem && currentItem.type === "order-slip") {
-              currentItem.orderSlipData = null
-              currentItem.orderHistoryData = historyResponse.data
-            }
-            return updatedHistory
-          })
-        }
-
-        // Refresh cash balance after order rejection (no cash change, but good to refresh)
-        if (userSession?.data.user_id) {
-          const cashResponse = await portfolioApi.fetchCashBalance(userSession.data.user_id)
-          if (cashResponse.success) {
-            setCashBalance(cashResponse.data?.cashBalance || 0)
-            console.log('[Order Reject] Cash balance refreshed:', cashResponse.data?.cashBalance)
-          }
-        }
-
-        toast({
-          title: "Order Rejected",
-          description: response.data?.message || `Order #${orderId} has been rejected and cancelled`
-        })
-      } else {
-        toast({
-          title: "Rejection Failed",
-          description: response.error || "Failed to reject order",
-          variant: "destructive"
-        })
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "An error occurred while rejecting the order",
-        variant: "destructive"
-      })
-    }
-  }
 
   // Touch event handlers for swipe gestures
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -2464,58 +2238,12 @@ export default function Home() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* User info with cash balance */}
+          {/* User info */}
           {userSession && (
             <div className="mr-2 text-sm text-muted-foreground flex items-center gap-2">
               <span className="font-medium">{userSession.data.name}</span>
               <span className="text-muted-foreground/70">|</span>
-              <span className="font-semibold text-green-600 dark:text-green-400">
-                Cash: ${cashBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-              <span className="text-muted-foreground/70">|</span>
-              <span className="text-xs">account {userSession.data.phone_number}</span>
-              {/* Refresh prices button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={async () => {
-                  if (!userSession?.data.user_id) return
-                  setIsRefreshingPrices(true)
-                  try {
-                    const result = await portfolioApi.refreshPrices(userSession.data.user_id)
-                    if (result.success) {
-                      // Reload cash balance after refresh
-                      const cashResponse = await portfolioApi.fetchCashBalance(userSession.data.user_id)
-                      if (cashResponse.success) {
-                        setCashBalance(cashResponse.data?.cashBalance || 0)
-                      }
-                      toast({
-                        title: "Prices Updated",
-                        description: result.data?.message || "All prices have been refreshed",
-                      })
-                    } else {
-                      toast({
-                        title: "Error",
-                        description: result.error || "Failed to refresh prices",
-                        variant: "destructive",
-                      })
-                    }
-                  } catch (error) {
-                    toast({
-                      title: "Error",
-                      description: "An error occurred while refreshing prices",
-                      variant: "destructive",
-                    })
-                  } finally {
-                    setIsRefreshingPrices(false)
-                  }
-                }}
-                disabled={isRefreshingPrices}
-                className="h-7 w-7"
-                title="Refresh prices"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${isRefreshingPrices ? 'animate-spin' : ''}`} />
-              </Button>
+              <span className="text-xs">account number {userSession.data.phone_number}</span>
             </div>
           )}
 
@@ -2737,30 +2465,15 @@ export default function Home() {
               <div className="p-3 rounded-xl border border-border bg-muted/30">
                 <AudioSphereVisualizer
                   isAssistantListening={isListening}
-                  isMuted={isMuted}
                   llmAudioElementRef={audioElementRef}
                   onStartAssistant={startAssistant}
                   onStopAssistant={stopAssistant}
                   canvasClassName="w-32 h-32 md:w-36 md:h-36 cursor-pointer"
                 />
               </div>
-
-              {/* Mute button - only visible when listening */}
-              {isListening && (
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={toggleMute}
-                  className="mt-3"
-                  aria-label={isMuted ? "Unmute" : "Mute"}
-                >
-                  {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                </Button>
-              )}
-
               <p className="text-xs text-muted-foreground mt-3 text-center">
                 {isListening
-                  ? (isMuted ? "Muted - Click button to unmute" : "Active - Click button to mute")
+                  ? "Tap to mute"
                   : mounted && rtcHelpers
                   ? "Tap to speak"
                   : "Initializing..."}
@@ -2873,11 +2586,6 @@ export default function Home() {
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
-            )}
-
-            {/* Atomic Loader - Shows while waiting for tool call responses */}
-            {isLoading && !showComponents && (
-              <AtomicLoader message="Processing your request..." />
             )}
 
             {/* Main Content Card - Shows Chart, Profile, Statistics, Analysis, Trending Tickers, or Financial Statements */}
@@ -3073,51 +2781,15 @@ export default function Home() {
 
               {/* Show Portfolio Aggregation */}
               {portfolioAggregationData && portfolioAggregationData.chartData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioRiskData && (
-                <div className="space-y-4">
-                  {/* View Toggle */}
-                  <div className="flex justify-end">
-                    <ToggleGroup
-                      type="single"
-                      value={aggregationViewMode}
-                      onValueChange={(value: 'donut' | 'bar') => value && setAggregationViewMode(value)}
-                      className="border border-border rounded-lg"
-                    >
-                      <ToggleGroupItem value="donut" aria-label="Donut chart view" className="text-xs px-3">
-                        🍩 Donut
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="bar" aria-label="Bar chart view" className="text-xs px-3">
-                        📊 Bar
-                      </ToggleGroupItem>
-                    </ToggleGroup>
-                  </div>
-
-                  {/* Chart Display */}
-                  {aggregationViewMode === 'donut' ? (
-                    <Card className="border-border">
-                      <CardContent className="p-6">
-                        <DonutChart
-                          data={portfolioAggregationData.chartData.donut}
-                          aggregationData={portfolioAggregationData.aggregation}
-                          title="Portfolio Distribution"
-                          subtitle="Your investments by category"
-                          initialDrillPath={currentHistoryIndex >= 0 ? contentHistory[currentHistoryIndex]?.portfolioAggregationDrillPath : undefined}
-                        />
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <Card className="border-border">
-                      <CardContent className="p-6">
-                        <StackedBarChart
-                          data={portfolioAggregationData.chartData.stackedBar}
-                          aggregationData={portfolioAggregationData.aggregation}
-                          title="Portfolio Distribution"
-                          subtitle="Your investments by category"
-                          initialDrillPath={currentHistoryIndex >= 0 ? contentHistory[currentHistoryIndex]?.portfolioAggregationDrillPath : undefined}
-                        />
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
+                <Card className="border-border">
+                  <CardContent className="p-6">
+                    <DonutChart
+                      data={portfolioAggregationData.chartData}
+                      title="Portfolio Distribution"
+                      subtitle="Your investments by category"
+                    />
+                  </CardContent>
+                </Card>
               )}
 
               {/* Show Portfolio Risk */}
@@ -3164,7 +2836,7 @@ export default function Home() {
               {portfolioBenchmarkData && portfolioBenchmarkData.chartData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioAggregationData && !portfolioRiskData && !portfolioAttributionData && !portfolioRelativePerformanceData && !portfolioPriceTrendData && (
                 <BenchmarkChart
                   data={portfolioBenchmarkData.chartData}
-                  benchmarkName={portfolioBenchmarkData.comparison[0]?.benchmarkValue ? "Benchmark" : "S&P 500"}
+                  benchmarkName={portfolioBenchmarkData.comparison[0]?.benchmarkValue ? "Benchmark" : "SPX"}
                   title="Portfolio vs Benchmark"
                   subtitle="Historical performance comparison"
                 />
@@ -3181,11 +2853,29 @@ export default function Home() {
 
               {/* Show Portfolio Relative Performance */}
               {portfolioRelativePerformanceData && portfolioRelativePerformanceData.performance && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioAggregationData && !portfolioRiskData && !portfolioBenchmarkData && !portfolioAttributionData && !portfolioPriceTrendData && (
-                <RelativePerformanceChart
-                  data={portfolioRelativePerformanceData.performance}
-                  title="Relative Performance"
-                  subtitle="Outperformance vs benchmarks"
-                />
+                <Card className="border-border">
+                  <CardContent className="p-6">
+                    <h3 className="text-lg font-semibold mb-4">Relative Performance</h3>
+                    <div className="space-y-2">
+                      {portfolioRelativePerformanceData.performance.map((item: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <p className="font-medium">{item.assetName}</p>
+                            <p className="text-sm text-muted-foreground">vs {item.relativeBenchmark}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className={`font-semibold ${item.outperformance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {item.outperformance >= 0 ? '+' : ''}{item.outperformance.toFixed(2)}%
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {item.portfolioReturn.toFixed(2)}% vs {item.benchmarkReturn.toFixed(2)}%
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
               )}
 
               {/* Show Portfolio Price Trends */}
@@ -3198,90 +2888,106 @@ export default function Home() {
                 />
               )}
 
-              {/* Show Order Slip with Order History */}
-              {orderPreviewData && orderPreviewData.orderPreview && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioAggregationData && !portfolioRiskData && !portfolioBenchmarkData && !portfolioAttributionData && !portfolioRelativePerformanceData && !portfolioPriceTrendData && (
+              {/* Show Orders Section - Preview + History Together */}
+              {(orderPreviewData || orderHistoryData) && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioAggregationData && !portfolioRiskData && !portfolioBenchmarkData && !portfolioAttributionData && !portfolioRelativePerformanceData && !portfolioPriceTrendData && (
                 <div className="space-y-4">
-                  {/* Order Slip Card */}
-                  <OrderSlipCard
-                    orderPreview={orderPreviewData.orderPreview}
-                    onConfirm={(orderId) => {
-                      // TODO: Implement confirm handler
-                      console.log("Confirm order:", orderId)
-                    }}
-                    onReject={(orderId) => {
-                      // TODO: Implement reject handler
-                      console.log("Reject order:", orderId)
-                    }}
-                  />
-
-                  {/* Order History Table - Display below order slip */}
-                  {orderHistoryData && orderHistoryData.orders && (
+                  {/* Order Preview Card - Show if exists */}
+                  {orderPreviewData && orderPreviewData.orderPreview && (
                     <Card className="border-border">
                       <CardHeader>
-                        <CardTitle>Order History</CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                          View and manage all your orders
-                        </p>
+                        <CardTitle className="flex items-center gap-2">
+                          <div className="flex items-center gap-2">
+                            <span>Order Preview - Pending Confirmation</span>
+                            <Badge variant="outline" style={{ color: "#FF9800" }}>Pending</Badge>
+                          </div>
+                        </CardTitle>
                       </CardHeader>
-                      <CardContent>
-                        <OrderHistoryTable
-                          orders={orderHistoryData.orders}
-                          userId={1}
-                          onOrderCancelled={() => {
-                            // Refresh order history after cancellation
-                            const refreshOrders = async () => {
-                              const response = await portfolioApi.fetchOrderHistory(1)
-                              if (response.success) {
-                                setOrderHistoryData(response.data)
-                                // Update the history entry
-                                setContentHistory(prevHistory => {
-                                  const updatedHistory = [...prevHistory]
-                                  const currentItem = updatedHistory[currentHistoryIndex]
-                                  if (currentItem && currentItem.type === "order-slip") {
-                                    currentItem.orderHistoryData = response.data
-                                  }
-                                  return updatedHistory
-                                })
-                              }
-                            }
-                            refreshOrders()
-                          }}
-                          onOrderUpdated={() => {
-                            // Refresh order history after update
-                            const refreshOrders = async () => {
-                              const response = await portfolioApi.fetchOrderHistory(1)
-                              if (response.success) {
-                                setOrderHistoryData(response.data)
-                                // Update the history entry
-                                setContentHistory(prevHistory => {
-                                  const updatedHistory = [...prevHistory]
-                                  const currentItem = updatedHistory[currentHistoryIndex]
-                                  if (currentItem && currentItem.type === "order-slip") {
-                                    currentItem.orderHistoryData = response.data
-                                  }
-                                  return updatedHistory
-                                })
-                              }
-                            }
-                            refreshOrders()
-                          }}
-                        />
+                      <CardContent className="space-y-6">
+                        {/* Order Details */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Order ID</p>
+                            <p className="text-lg font-semibold">#{orderPreviewData.orderPreview.orderId}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Symbol</p>
+                            <p className="text-lg font-semibold">{orderPreviewData.orderPreview.symbol}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Action</p>
+                            <Badge variant={orderPreviewData.orderPreview.buySell === "Buy" ? "default" : "destructive"}>
+                              {orderPreviewData.orderPreview.buySell}
+                            </Badge>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Quantity</p>
+                            <p className="text-lg font-semibold">{orderPreviewData.orderPreview.quantity} shares</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Estimated Price</p>
+                            <p className="text-lg font-semibold">
+                              {new Intl.NumberFormat("en-US", {
+                                style: "currency",
+                                currency: "USD",
+                                minimumFractionDigits: 2,
+                              }).format(orderPreviewData.orderPreview.estimatedPrice)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Estimated Total</p>
+                            <p className="text-lg font-semibold">
+                              {new Intl.NumberFormat("en-US", {
+                                style: "currency",
+                                currency: "USD",
+                                minimumFractionDigits: 2,
+                              }).format(orderPreviewData.orderPreview.estimatedTotal)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Account Balance Info */}
+                        <div className="border-t pt-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-sm text-muted-foreground">Account</p>
+                              <p className="text-base font-medium">{orderPreviewData.orderPreview.accountName}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-muted-foreground">Current Balance</p>
+                              <p className="text-base font-medium">
+                                {new Intl.NumberFormat("en-US", {
+                                  style: "currency",
+                                  currency: "USD",
+                                  minimumFractionDigits: 2,
+                                }).format(orderPreviewData.orderPreview.accountBalance)}
+                              </p>
+                            </div>
+                            <div className="col-span-2">
+                              <p className="text-sm text-muted-foreground">Balance After Trade</p>
+                              <p className="text-xl font-bold">
+                                {new Intl.NumberFormat("en-US", {
+                                  style: "currency",
+                                  currency: "USD",
+                                  minimumFractionDigits: 2,
+                                }).format(orderPreviewData.orderPreview.balanceAfterTrade)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Instructions */}
+                        <div className="bg-muted/50 p-4 rounded-lg">
+                          <p className="text-sm text-muted-foreground">
+                            This order is pending confirmation. Say &quot;confirm order {orderPreviewData.orderPreview.orderId}&quot; to execute it,
+                            or &quot;reject order {orderPreviewData.orderPreview.orderId}&quot; to cancel.
+                          </p>
+                        </div>
                       </CardContent>
                     </Card>
                   )}
-                </div>
-              )}
 
-              {/* Show Order History Only (when no pending order slip) */}
-              {orderHistoryData && orderHistoryData.orders && !orderPreviewData && !chartData && !profileData && !statisticsData && !analysisData && !recommendationTrendData && !earningsCalendarData && !trendingTickersData && !insiderTransactionsData && !balanceSheetData && !incomeStatementDataState && !cashFlowDataState && !portfolioHoldingsData && !portfolioAggregationData && !portfolioRiskData && !portfolioBenchmarkData && !portfolioAttributionData && !portfolioRelativePerformanceData && !portfolioPriceTrendData && (
-                <Card className="border-border">
-                  <CardHeader>
-                    <CardTitle>Order History</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      View and manage all your orders
-                    </p>
-                  </CardHeader>
-                  <CardContent>
+                  {/* Order History Table - Always show when in orders view */}
+                  {orderHistoryData && orderHistoryData.orders && (
                     <OrderHistoryTable
                       orders={orderHistoryData.orders}
                       userId={1}
@@ -3296,7 +3002,7 @@ export default function Home() {
                         refreshOrders()
                       }}
                       onOrderUpdated={() => {
-                        // Refresh order history after update
+                        // Refresh order history after update/confirmation
                         const refreshOrders = async () => {
                           const response = await portfolioApi.fetchOrderHistory(1)
                           if (response.success) {
@@ -3306,8 +3012,8 @@ export default function Home() {
                         refreshOrders()
                       }}
                     />
-                  </CardContent>
-                </Card>
+                  )}
+                </div>
               )}
 
               {/* Show loading or empty state */}

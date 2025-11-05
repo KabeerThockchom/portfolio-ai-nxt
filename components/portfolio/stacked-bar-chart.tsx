@@ -6,26 +6,27 @@ import { useTheme } from "next-themes"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft } from "lucide-react"
-import type { DonutChartData, PortfolioAggregation } from "@/types/portfolio"
+import type { StackedBarChartData, PortfolioAggregation } from "@/types/portfolio"
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false })
 
-interface DonutChartProps {
-  data: DonutChartData
+interface StackedBarChartProps {
+  data: StackedBarChartData
   aggregationData?: PortfolioAggregation[]  // For multi-level support
   title: string
   subtitle?: string
+  onBarClick?: (category: string) => void
   initialDrillPath?: string[]  // For restoring from history
 }
 
-export function DonutChart({ data, aggregationData, title, subtitle, initialDrillPath }: DonutChartProps) {
+export function StackedBarChart({ data, aggregationData, title, subtitle, onBarClick, initialDrillPath }: StackedBarChartProps) {
   const { theme } = useTheme()
   const isDarkMode = theme === "dark"
   const textColor = isDarkMode ? "#FFFFFF" : "#333333"
 
   // State for multi-level navigation using drill path
   const [drillPath, setDrillPath] = useState<string[]>(initialDrillPath || [])
-  const [chartData, setChartData] = useState<DonutChartData>(data)
+  const [chartData, setChartData] = useState<StackedBarChartData>(data)
   const [currentData, setCurrentData] = useState<PortfolioAggregation[]>(aggregationData || [])
 
   // Reset to top level when data changes
@@ -63,9 +64,12 @@ export function DonutChart({ data, aggregationData, title, subtitle, initialDril
         "#FFA500", "#DAA520", "#20B2AA", "#FF6347", "#7B68EE"
       ]
 
-      const restoredChartData: DonutChartData = {
-        labels: targetData.map(c => c.label),
-        series: targetData.map(c => c.totalValue),
+      const restoredChartData: StackedBarChartData = {
+        categories: targetData.map(c => c.label),
+        series: [{
+          name: initialDrillPath[initialDrillPath.length - 1],
+          data: targetData.map(c => c.totalValue),
+        }],
         colors: targetData.map((c, index) =>
           sectorColors[c.label] || defaultColorPalette[index % defaultColorPalette.length]
         ),
@@ -83,7 +87,7 @@ export function DonutChart({ data, aggregationData, title, subtitle, initialDril
   }, [data, aggregationData, initialDrillPath])
 
   // Handle drill-down through arbitrary levels
-  const handleSliceClick = (event: any, chartContext: any, config: any) => {
+  const handleBarClick = (event: any, chartContext: any, config: any) => {
     if (!aggregationData) return  // No multi-level data available
 
     const clickedIndex = config.dataPointIndex
@@ -108,7 +112,7 @@ export function DonutChart({ data, aggregationData, title, subtitle, initialDril
       "Basic Materials": "#8B4513",
     }
 
-    // Default color palette for deeper levels (tickers, etc.)
+    // Default color palette for deeper levels
     const defaultColorPalette = [
       "#00D9FF", "#00FF88", "#FFD700", "#FF6B9D", "#FF4500",
       "#9370DB", "#32CD32", "#FF8C00", "#4169E1", "#FF1493",
@@ -117,9 +121,12 @@ export function DonutChart({ data, aggregationData, title, subtitle, initialDril
     ]
 
     // Create chart data for children
-    const drillData: DonutChartData = {
-      labels: parent.children.map(c => c.label),
-      series: parent.children.map(c => c.totalValue),
+    const drillData: StackedBarChartData = {
+      categories: parent.children.map(c => c.label),
+      series: [{
+        name: parent.label,
+        data: parent.children.map(c => c.totalValue),
+      }],
       colors: parent.children.map((c, index) =>
         sectorColors[c.label] || defaultColorPalette[index % defaultColorPalette.length]
       ),
@@ -129,6 +136,10 @@ export function DonutChart({ data, aggregationData, title, subtitle, initialDril
     setDrillPath([...drillPath, parent.label])
     setCurrentData(parent.children)
     setChartData(drillData)
+
+    if (onBarClick) {
+      onBarClick(parent.label)
+    }
   }
 
   // Handle navigation to specific level in drill path
@@ -175,9 +186,12 @@ export function DonutChart({ data, aggregationData, title, subtitle, initialDril
       "#FFA500", "#DAA520", "#20B2AA", "#FF6347", "#7B68EE"
     ]
 
-    const newChartData: DonutChartData = {
-      labels: targetData.map(c => c.label),
-      series: targetData.map(c => c.totalValue),
+    const newChartData: StackedBarChartData = {
+      categories: targetData.map(c => c.label),
+      series: [{
+        name: targetPath[targetPath.length - 1],
+        data: targetData.map(c => c.totalValue),
+      }],
       colors: targetData.map((c, index) =>
         sectorColors[c.label] || defaultColorPalette[index % defaultColorPalette.length]
       ),
@@ -195,13 +209,76 @@ export function DonutChart({ data, aggregationData, title, subtitle, initialDril
 
   const options = {
     chart: {
-      type: "donut" as const,
+      type: "bar" as const,
+      stacked: true,
       background: "transparent",
+      toolbar: {
+        show: true,
+        tools: {
+          download: true,
+          zoom: false,
+          zoomin: false,
+          zoomout: false,
+          pan: false,
+          reset: false,
+        },
+      },
       events: {
-        dataPointSelection: aggregationData ? handleSliceClick : undefined,
+        dataPointSelection: aggregationData ? handleBarClick : undefined,
       },
     },
-    labels: chartData.labels,
+    plotOptions: {
+      bar: {
+        horizontal: true,
+        dataLabels: {
+          total: {
+            enabled: true,
+            offsetX: 0,
+            style: {
+              fontSize: '13px',
+              fontWeight: 600,
+              color: textColor,
+            },
+            formatter: function (val: number) {
+              return `$${val.toLocaleString()}`
+            },
+          },
+        },
+      },
+    },
+    stroke: {
+      width: 1,
+      colors: ['#fff'],
+    },
+    xaxis: {
+      categories: chartData.categories,
+      labels: {
+        style: {
+          colors: textColor,
+        },
+        formatter: function (val: number) {
+          return `$${val.toLocaleString()}`
+        },
+      },
+    },
+    yaxis: {
+      labels: {
+        style: {
+          colors: textColor,
+        },
+      },
+    },
+    tooltip: {
+      theme: isDarkMode ? "dark" : "light",
+      y: {
+        formatter: function (val: number) {
+          return `$${val.toLocaleString()}`
+        },
+      },
+    },
+    fill: {
+      opacity: 1,
+    },
     colors: chartData.colors || [
       "#FFE600", // EY Yellow
       "#FFFFFF", // White
@@ -214,6 +291,7 @@ export function DonutChart({ data, aggregationData, title, subtitle, initialDril
     ],
     legend: {
       position: "bottom" as const,
+      horizontalAlign: "center" as const,
       labels: {
         colors: textColor,
       },
@@ -221,40 +299,21 @@ export function DonutChart({ data, aggregationData, title, subtitle, initialDril
     dataLabels: {
       enabled: true,
       formatter: function (val: number) {
-        return val.toFixed(1) + "%"
+        // Show percentage of total
+        const total = chartData.series.reduce((sum, s) =>
+          sum + s.data.reduce((a: number, b: number) => a + b, 0), 0)
+        const percent = (val / total) * 100
+        return percent > 5 ? `${percent.toFixed(1)}%` : ''  // Only show if > 5%
       },
-    },
-    plotOptions: {
-      pie: {
-        donut: {
-          size: "65%",
-          labels: {
-            show: true,
-            total: {
-              show: true,
-              label: "Total",
-              fontSize: "16px",
-              fontWeight: 600,
-              color: textColor,
-              formatter: function (w: any) {
-                const total = w.globals.seriesTotals.reduce((a: number, b: number) => a + b, 0)
-                return `$${total.toLocaleString()}`
-              },
-            },
-            value: {
-              color: textColor,
-            },
-          },
-        },
+      style: {
+        colors: ['#000'],
+        fontSize: '12px',
       },
     },
     responsive: [
       {
         breakpoint: 480,
         options: {
-          chart: {
-            width: 300,
-          },
           legend: {
             position: "bottom" as const,
           },
@@ -320,7 +379,12 @@ export function DonutChart({ data, aggregationData, title, subtitle, initialDril
         </div>
       </CardHeader>
       <CardContent>
-        <Chart options={options} series={chartData.series} type="donut" height={350} />
+        <Chart
+          options={options}
+          series={chartData.series}
+          type="bar"
+          height={Math.max(350, chartData.categories.length * 50)} // Dynamic height based on categories
+        />
       </CardContent>
     </Card>
   )

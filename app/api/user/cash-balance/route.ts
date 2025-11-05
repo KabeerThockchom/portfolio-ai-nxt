@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db/connection"
-import { userPortfolio, assetType, assetHistory } from "@/lib/db/schema"
+import { userPortfolio, assetType, assetHistory, userAccounts } from "@/lib/db/schema"
 import { eq, and, desc } from "drizzle-orm"
+import { sql } from "drizzle-orm"
 import type { CashBalanceResponse } from "@/types/portfolio"
 
 export async function GET(request: Request) {
@@ -18,23 +19,15 @@ export async function GET(request: Request) {
 
     const userIdNum = parseInt(userId)
 
-    // Get cash holdings (asset_class = "Cash")
-    const cashHoldings = await db
-      .select()
-      .from(userPortfolio)
-      .where(eq(userPortfolio.userId, userIdNum))
-      .leftJoin(assetType, eq(userPortfolio.assetId, assetType.assetId))
-      .then((results) =>
-        results.filter(
-          ({ asset_type }) =>
-            asset_type?.assetClass?.toLowerCase() === "cash"
-        )
-      )
+    // Get cash balance from user_accounts table (single source of truth)
+    const accountsResult = await db
+      .select({
+        totalCash: sql<number>`SUM(${userAccounts.cashBalance})`
+      })
+      .from(userAccounts)
+      .where(eq(userAccounts.userId, userIdNum))
 
-    // Calculate total cash balance (sum of all cash holdings)
-    const cashBalance = cashHoldings.reduce((sum, { user_portfolio }) => {
-      return sum + (user_portfolio.assetTotalUnits || 0)
-    }, 0)
+    const cashBalance = accountsResult[0]?.totalCash || 0
 
     // Get all portfolio holdings to calculate total portfolio value
     const allHoldings = await db
@@ -44,7 +37,7 @@ export async function GET(request: Request) {
       .leftJoin(assetType, eq(userPortfolio.assetId, assetType.assetId))
 
     // Calculate total portfolio value with latest prices
-    let totalPortfolioValue = 0
+    let totalPortfolioValue = cashBalance // Start with cash from user_accounts
     let totalInvested = 0
 
     for (const { user_portfolio, asset_type } of allHoldings) {
@@ -52,21 +45,21 @@ export async function GET(request: Request) {
 
       if (!asset_type) continue
 
-      // Cash is already at face value
+      // Skip cash holdings in user_portfolio (cash is in user_accounts now)
       if (asset_type.assetClass?.toLowerCase() === "cash") {
-        totalPortfolioValue += user_portfolio.assetTotalUnits
-      } else {
-        // Get latest price for non-cash assets
-        const latestPriceRecord = await db
-          .select()
-          .from(assetHistory)
-          .where(eq(assetHistory.assetId, asset_type.assetId))
-          .orderBy(desc(assetHistory.date))
-          .limit(1)
-
-        const latestClosePrice = latestPriceRecord[0]?.closePrice || 0
-        totalPortfolioValue += user_portfolio.assetTotalUnits * latestClosePrice
+        continue
       }
+
+      // Get latest price for non-cash assets
+      const latestPriceRecord = await db
+        .select()
+        .from(assetHistory)
+        .where(eq(assetHistory.assetId, asset_type.assetId))
+        .orderBy(desc(assetHistory.date))
+        .limit(1)
+
+      const latestClosePrice = latestPriceRecord[0]?.closePrice || 0
+      totalPortfolioValue += user_portfolio.assetTotalUnits * latestClosePrice
     }
 
     const response: CashBalanceResponse = {

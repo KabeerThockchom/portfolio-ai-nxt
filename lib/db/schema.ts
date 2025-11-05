@@ -108,6 +108,7 @@ export const assetHistory = sqliteTable("asset_history", {
     .references(() => assetType.assetId, { onDelete: "cascade" }),
   date: text("date").notNull(), // DATE stored as text in SQLite
   closePrice: real("close_price").notNull(),
+  updatedAt: text("updated_at"), // Timestamp when price was last updated
 })
 
 // Asset Sector table - Sector breakdown
