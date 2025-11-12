@@ -36,14 +36,12 @@ export async function GET(request: Request) {
     }
 
     const response = await fetch(
-      // "https://fsodnaopenai2.openai.azure.com/openai/realtimeapi/sessions?api-version=2025-04-01-preview",
-      "https://voiceaistudio9329552017.openai.azure.com/openai/realtimeapi/sessions?api-version=2025-04-01-preview",
+      "https://api.openai.com/v1/realtime/sessions",
       {
         method: "POST",
         headers: {
-          "api-key": process.env.OPENAI_API_KEY || "",
-          "Content-Type": "application/json",
-          "api-version": "2025-08-28"
+          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           // model: "gpt-4o-realtime-preview",

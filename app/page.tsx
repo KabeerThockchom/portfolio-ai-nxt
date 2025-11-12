@@ -2077,20 +2077,21 @@ export default function Home() {
       }
       const EPHEMERAL_KEY = sessionData.result.client_secret.value;
 
-      const baseUrl = "https://eastus2.realtimeapi-preview.ai.azure.com/v1/realtimertc";
-      const model = "gpt-4o-mini-realtime-preview";
+      const baseUrl = "https://api.openai.com/v1/realtime";
+      const model = "gpt-realtime";
       const response = await fetch(`${baseUrl}?model=${model}`, {
         method: "POST",
         body: offer.sdp,
         headers: {
           Authorization: `Bearer ${EPHEMERAL_KEY}`,
           "Content-Type": "application/sdp",
+          "OpenAI-Beta": "realtime=v1",
         },
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Azure API request failed: ${response.status} ${errorText}`);
+        throw new Error(`OpenAI API request failed: ${response.status} ${errorText}`);
       }
 
       const answer = await response.text();

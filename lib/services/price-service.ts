@@ -386,8 +386,7 @@ async function updatePriceCache(symbol: string, date: string, price: number): Pr
       await db
         .update(assetHistory)
         .set({
-          closePrice: price,
-          updatedAt: now
+          closePrice: price
         })
         .where(eq(assetHistory.assetHistId, existingRecord[0].assetHistId))
 
@@ -397,8 +396,7 @@ async function updatePriceCache(symbol: string, date: string, price: number): Pr
       await db.insert(assetHistory).values({
         assetId,
         date,
-        closePrice: price,
-        updatedAt: now
+        closePrice: price
       })
 
       console.log(`[Cache INSERT] ${symbol}: $${price} (date: ${date})`)

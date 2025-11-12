@@ -4,10 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-EY Prometheus is a voice-enabled AI web application for financial insights, stock analysis, and portfolio management. It's built with Next.js 15+ (App Router) using React 19, TypeScript, and Tailwind CSS. The application integrates Azure OpenAI's real-time API (model: `gpt-realtime`) for voice interaction via WebRTC and fetches stock data from Yahoo Finance via RapidAPI.
+EY Prometheus is a voice-enabled AI web application for financial insights, stock analysis, and portfolio management. It's built with Next.js 15+ (App Router) using React 19, TypeScript, and Tailwind CSS. The application integrates OpenAI's Realtime API (model: `gpt-realtime`) for voice interaction via WebRTC and fetches stock data from Yahoo Finance via RapidAPI.
 
 **Key Features:**
-- Real-time voice interaction with Azure OpenAI
+- Real-time voice interaction with OpenAI
 - 11 different content types: charts, profiles, statistics, analysis, recommendation trends, earnings calendar, trending tickers, insider transactions, balance sheets, income statements, and cash flow statements
 - **Portfolio Management System** (NEW):
   - Portfolio holdings tracking with real-time valuations
@@ -52,11 +52,11 @@ Required environment variables in `.env.local`:
 # RapidAPI Key for Yahoo Finance API (used in app/api/stock/*)
 RAPID_API_KEY=your_rapidapi_key_here
 
-# Azure OpenAI API Key for voice assistant (used in app/api/session/route.ts)
-OPENAI_API_KEY=your_azure_openai_api_key_here
+# OpenAI API Key for voice assistant (used in app/api/session/route.ts)
+OPENAI_API_KEY=your_openai_api_key_here
 ```
 
-Never commit API keys or credentials. The Azure endpoint URL is hardcoded in `app/api/session/route.ts` and should be updated if using a different Azure resource.
+Never commit API keys or credentials. The OpenAI Realtime API endpoint is configured in `app/api/session/route.ts` and `app/page.tsx`.
 
 ## Architecture
 
@@ -90,7 +90,7 @@ app/
 │   ├── user/         # User-specific data (NEW)
 │   │   └── cash-balance/ # Cash balance and total portfolio value
 │   ├── keys/         # Exposes RapidAPI key to client
-│   ├── session/      # Creates Azure AI voice sessions
+│   ├── session/      # Creates OpenAI Realtime voice sessions
 │   ├── market/       # Market-level data requests
 │   │   └── trending-tickers/ # Fetches trending stocks
 │   └── stock/        # Proxies stock data requests
@@ -258,13 +258,13 @@ This modular approach improves:
 The voice assistant uses a sophisticated WebRTC pipeline:
 
 1. **Session Initialization** (`app/api/session/route.ts`):
-   - Creates Azure OpenAI real-time session (model: `gpt-realtime`)
-   - Endpoint: `voiceaistudio9329552017.openai.azure.com`
+   - Creates OpenAI Realtime session (model: `gpt-realtime`)
+   - Endpoint: `api.openai.com/v1/realtime/sessions`
    - Returns ephemeral access token for WebRTC connection
    - Configures AI personality and system instructions
 
 2. **WebRTC Connection** (via `use-voice-session.ts` hook):
-   - Establishes peer-to-peer connection with Azure using `RTCPeerConnection`
+   - Establishes peer-to-peer connection with OpenAI using `RTCPeerConnection`
    - Opens data channel (`oai-events`) for JSON event exchange
    - Sends audio stream from user's microphone
    - Receives AI-generated speech audio
@@ -289,8 +289,8 @@ The voice assistant uses a sophisticated WebRTC pipeline:
    - AI incorporates data into spoken response
 
 4. **Response Cycle**:
-   - User speaks → STT (Azure) → GPT processes → calls function if needed
-   - Function result returned → AI generates answer → TTS (Azure) → audio output
+   - User speaks → STT (OpenAI) → GPT processes → calls function if needed
+   - Function result returned → AI generates answer → TTS (OpenAI) → audio output
    - All function calls are logged and displayed in the Tool Calls Panel
 
 ### Stock Data Flow
@@ -724,7 +724,7 @@ Edit system instructions in `app/api/session/route.ts` (around line 33+). The AI
 ### Testing Voice Features
 
 1. Ensure environment variables are set (`.env.local`):
-   - `OPENAI_API_KEY` (Azure OpenAI)
+   - `OPENAI_API_KEY` (OpenAI)
    - `RAPID_API_KEY` (RapidAPI)
 
 2. Run development server:
@@ -776,11 +776,11 @@ Edit system instructions in `app/api/session/route.ts` (around line 33+). The AI
 
 ### Core Services
 
-- **Azure OpenAI**: Real-time API endpoint
+- **OpenAI**: Realtime API endpoint
   - Model: `gpt-realtime`
-  - Endpoint: `voiceaistudio9329552017.openai.azure.com`
+  - Endpoint: `api.openai.com/v1/realtime`
   - Used for voice interaction, STT, TTS, and function calling
-  - Configured in `app/api/session/route.ts`
+  - Configured in `app/api/session/route.ts` and `app/page.tsx`
 
 - **RapidAPI (Yahoo Finance)**: Stock data provider
   - Endpoint: `yahoo-finance-real-time1.p.rapidapi.com`
@@ -1043,12 +1043,12 @@ Tests all 10 API routes with real database data.
 **Security:**
 - API keys managed server-side except where explicitly exposed via `/api/keys`
 - RapidAPI key required for all stock data endpoints
-- Azure OpenAI key required for voice features
+- OpenAI API key required for voice features
 - Never commit `.env` or `.env.local` files
 
 **Voice Sessions:**
-- Voice sessions use Azure OpenAI's `gpt-realtime` model
-- Endpoint: `voiceaistudio9329552017.openai.azure.com`
+- Voice sessions use OpenAI's `gpt-realtime` model
+- Endpoint: `api.openai.com/v1/realtime`
 - New session created each time user activates assistant (sessions are ephemeral)
 - **21 AI functions available**: 11 stock data + 10 portfolio management
 - All function calls logged and displayed in Tool Calls Panel

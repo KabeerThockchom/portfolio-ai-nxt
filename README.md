@@ -5,10 +5,10 @@
 ![Next.js](https://img.shields.io/badge/Next.js-15.2.4-black?style=for-the-badge&logo=next.js)
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript)
-![Azure OpenAI](https://img.shields.io/badge/Azure_OpenAI-GPT--4-412991?style=for-the-badge&logo=microsoft-azure)
+![OpenAI](https://img.shields.io/badge/OpenAI-GPT--Realtime-74aa9c?style=for-the-badge&logo=openai)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css)
 
-**Voice-enabled AI portfolio assistant powered by Azure OpenAI. Get real-time portfolio analytics, risk analysis, stock charts, company profiles, analyst insights, and market data.**
+**Voice-enabled AI portfolio assistant powered by OpenAI Realtime API. Get real-time portfolio analytics, risk analysis, stock charts, company profiles, analyst insights, and market data.**
 
 [Features](#-features) • [Architecture](#-architecture) • [Getting Started](#-getting-started) • [API Reference](#-api-reference) • [Deployment](#-deployment)
 
@@ -35,7 +35,7 @@
 
 ## Overview
 
-EY Prometheus is a cutting-edge web application that combines voice interaction with real-time financial data analysis and portfolio management. Built with Next.js 15 and powered by Azure OpenAI's GPT-4 real-time API, it provides an intuitive, hands-free way to explore stock markets, analyze companies, manage portfolios, and track market trends.
+EY Prometheus is a cutting-edge web application that combines voice interaction with real-time financial data analysis and portfolio management. Built with Next.js 15 and powered by OpenAI's Realtime API (gpt-realtime model), it provides an intuitive, hands-free way to explore stock markets, analyze companies, manage portfolios, and track market trends.
 
 The application leverages **WebRTC** for low-latency voice streaming, **function calling** for dynamic data retrieval, and **ApexCharts** for interactive visualizations—all wrapped in a modern, responsive UI with dark/light theme support.
 
@@ -57,8 +57,8 @@ The application leverages **WebRTC** for low-latency voice streaming, **function
 
 ### Voice-Controlled AI Assistant
 
-- **WebRTC-Based Audio Streaming**: Direct peer-to-peer connection with Azure OpenAI for minimal latency
-- **Natural Language Processing**: Powered by GPT-4 with real-time speech-to-text and text-to-speech
+- **WebRTC-Based Audio Streaming**: Direct peer-to-peer connection with OpenAI Realtime API for minimal latency
+- **Natural Language Processing**: Powered by gpt-realtime model with real-time speech-to-text and text-to-speech
 - **Function Calling**: AI dynamically calls appropriate functions based on user queries
 - **Conversation Memory**: Maintains context across the session for natural follow-up questions
 
@@ -184,10 +184,10 @@ graph TB
     User[👤 User Browser] --> UI[⚛️ Next.js Frontend<br/>React 19 + TypeScript]
     UI --> API[🔧 Next.js API Routes<br/>Serverless Functions]
 
-    API --> Azure[☁️ Azure OpenAI<br/>Real-time API<br/>GPT-4 + Speech]
+    API --> OpenAI[☁️ OpenAI<br/>Realtime API<br/>gpt-realtime + Speech]
     API --> Yahoo[📊 Yahoo Finance API<br/>via RapidAPI]
 
-    Azure --> |WebRTC<br/>Audio + Data Channel| UI
+    OpenAI --> |WebRTC<br/>Audio + Data Channel| UI
     Yahoo --> |JSON<br/>Stock Data| API
 
     UI --> Charts[📈 ApexCharts]
@@ -196,7 +196,7 @@ graph TB
     style User fill:#e1f5ff
     style UI fill:#61dafb
     style API fill:#000000
-    style Azure fill:#412991
+    style OpenAI fill:#74aa9c
     style Yahoo fill:#720e9e
 ```
 
@@ -208,27 +208,27 @@ sequenceDiagram
     participant 👤 User
     participant 🌐 Browser
     participant 🔧 API Route
-    participant ☁️ Azure AI
+    participant ☁️ OpenAI
 
     👤 User->>🌐 Browser: Click Microphone
     🌐 Browser->>🔧 API Route: GET /api/session
-    🔧 API Route->>☁️ Azure AI: Create Real-time Session
-    ☁️ Azure AI-->>🔧 API Route: Ephemeral Access Token
+    🔧 API Route->>☁️ OpenAI: Create Realtime Session
+    ☁️ OpenAI-->>🔧 API Route: Ephemeral Access Token
     🔧 API Route-->>🌐 Browser: Session Credentials
 
-    🌐 Browser->>☁️ Azure AI: WebRTC Connection (SDP Offer)
-    ☁️ Azure AI-->>🌐 Browser: SDP Answer + Data Channel
+    🌐 Browser->>☁️ OpenAI: WebRTC Connection (SDP Offer)
+    ☁️ OpenAI-->>🌐 Browser: SDP Answer + Data Channel
 
     🌐 Browser->>🌐 Browser: Send 11 Available Functions<br/>(getStockChart, getInsiderTransactions, etc.)
 
     👤 User->>🌐 Browser: Speak Query
-    🌐 Browser->>☁️ Azure AI: Audio Stream (Microphone)
+    🌐 Browser->>☁️ OpenAI: Audio Stream (Microphone)
 
-    ☁️ Azure AI->>☁️ Azure AI: Speech-to-Text
-    ☁️ Azure AI->>☁️ Azure AI: GPT-4 Processing
-    ☁️ Azure AI->>☁️ Azure AI: Decide Function Call
+    ☁️ OpenAI->>☁️ OpenAI: Speech-to-Text
+    ☁️ OpenAI->>☁️ OpenAI: gpt-realtime Processing
+    ☁️ OpenAI->>☁️ OpenAI: Decide Function Call
 
-    ☁️ Azure AI-->>🌐 Browser: Function Call Request<br/>(JSON via Data Channel)
+    ☁️ OpenAI-->>🌐 Browser: Function Call Request<br/>(JSON via Data Channel)
 
     🌐 Browser->>🔧 API Route: Execute Function<br/>(e.g., /api/stock/chart)
     🔧 API Route->>📊 Yahoo Finance: Fetch Stock Data
@@ -236,11 +236,11 @@ sequenceDiagram
     🔧 API Route-->>🌐 Browser: Stock Data
 
     🌐 Browser->>🌐 Browser: Update UI (Chart/Stats)
-    🌐 Browser->>☁️ Azure AI: Function Result (JSON)
+    🌐 Browser->>☁️ OpenAI: Function Result (JSON)
 
-    ☁️ Azure AI->>☁️ Azure AI: Generate Response
-    ☁️ Azure AI->>☁️ Azure AI: Text-to-Speech
-    ☁️ Azure AI-->>🌐 Browser: Audio Stream (Response)
+    ☁️ OpenAI->>☁️ OpenAI: Generate Response
+    ☁️ OpenAI->>☁️ OpenAI: Text-to-Speech
+    ☁️ OpenAI-->>🌐 Browser: Audio Stream (Response)
 
     🌐 Browser->>👤 User: Play Voice + Show Visuals
 ```
@@ -250,8 +250,8 @@ sequenceDiagram
 ```mermaid
 graph LR
     A[🎤 Voice Input] --> B[📡 WebRTC]
-    B --> C[🎯 Azure STT]
-    C --> D[🤖 GPT-4<br/>Function Calling]
+    B --> C[🎯 OpenAI STT]
+    C --> D[🤖 gpt-realtime<br/>Function Calling]
 
     D --> E{Function<br/>Type?}
 
@@ -274,7 +274,7 @@ graph LR
     I --> J[🎨 UI Re-render]
 
     H --> D
-    D --> K[🔊 Azure TTS]
+    D --> K[🔊 OpenAI TTS]
     K --> L[🔈 Audio Output]
 
     style A fill:#ff9999
@@ -337,7 +337,7 @@ graph TD
 | Technology | Purpose |
 |------------|---------|
 | **Next.js API Routes** | Serverless backend functions |
-| **Azure OpenAI** | GPT-4 real-time API with function calling |
+| **OpenAI Realtime API** | gpt-realtime model with function calling |
 | **WebRTC** | Real-time audio/data streaming |
 | **Yahoo Finance API** | Stock market data (via RapidAPI) |
 | **RapidAPI** | API marketplace and authentication |
@@ -357,7 +357,7 @@ graph TD
 
 - **Node.js** 18.x or later
 - **pnpm** (recommended) or npm/yarn
-- **Azure OpenAI** account with real-time API access
+- **OpenAI** account with Realtime API access
 - **RapidAPI** account with Yahoo Finance subscription
 
 ### Installation
@@ -387,8 +387,8 @@ Create a `.env.local` file in the root directory:
 # RapidAPI Key for Yahoo Finance API
 RAPID_API_KEY=your_rapidapi_key_here
 
-# Azure OpenAI API Key for voice assistant
-OPENAI_API_KEY=your_azure_openai_api_key_here
+# OpenAI API Key for voice assistant
+OPENAI_API_KEY=your_openai_api_key_here
 ```
 
 **How to get API keys:**
@@ -398,12 +398,12 @@ OPENAI_API_KEY=your_azure_openai_api_key_here
   2. Subscribe to [Yahoo Finance API](https://rapidapi.com/sparior/api/yahoo-finance15)
   3. Copy your API key from the dashboard
 
-- **Azure OpenAI Key**:
-  1. Create an [Azure account](https://azure.microsoft.com/)
-  2. Create an Azure OpenAI resource in East US 2 region
-  3. Deploy the `gpt-realtime` model (or `gpt-4o-realtime-preview`)
-  4. Copy the API key from Keys and Endpoint section
-  5. **Important**: Update the endpoint URL in `app/api/session/route.ts` if not using `voiceaistudio9329552017.openai.azure.com`
+- **OpenAI API Key**:
+  1. Create an [OpenAI account](https://platform.openai.com/signup)
+  2. Add billing information to your account
+  3. Navigate to [API keys](https://platform.openai.com/api-keys)
+  4. Create a new API key with project access
+  5. Copy the API key (starts with `sk-proj-` or `sk-`)
 
 4. **Run the development server**
 
@@ -449,7 +449,7 @@ portfolio-ai-nxt-3/
 │   │   │   ├── insider-transactions/  # GET insider trading data (NEW)
 │   │   │   └── financials/       # GET financial statements (NEW)
 │   │   ├── keys/                 # GET API keys (client-side)
-│   │   └── session/              # GET Azure session token
+│   │   └── session/              # GET OpenAI Realtime session token
 │   │
 │   ├── layout.tsx                # Root layout with providers
 │   ├── page.tsx                  # Main app page (UI orchestrator)
@@ -828,7 +828,7 @@ Clear all conversation history.
 
 #### GET `/api/session`
 
-Create a new Azure OpenAI real-time session.
+Create a new OpenAI Realtime session.
 
 **Query Parameters:**
 - `timezone` (optional): User's timezone (e.g., "America/New_York")
@@ -842,11 +842,11 @@ Create a new Azure OpenAI real-time session.
     "expires_at": 1234567890
   },
   "model": "gpt-realtime",
-  "voice": "verse"
+  "voice": "cedar"
 }
 ```
 
-**Note:** The session endpoint creates a connection to Azure OpenAI's real-time API at `voiceaistudio9329552017.openai.azure.com`. 11 AI functions are automatically configured for stock data retrieval.
+**Note:** The session endpoint creates a connection to OpenAI's Realtime API at `api.openai.com/v1/realtime/sessions`. 11 AI functions are automatically configured for stock data retrieval.
 
 #### GET `/api/keys`
 
@@ -945,12 +945,12 @@ pnpm lint
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `RAPID_API_KEY` | Yes | RapidAPI key for Yahoo Finance API |
-| `OPENAI_API_KEY` | Yes | Azure OpenAI API key for voice assistant |
+| `OPENAI_API_KEY` | Yes | OpenAI API key for voice assistant (Realtime API) |
 
 ### Key Files to Know
 
 - **`app/page.tsx`**: Main UI orchestrator - composes hooks and handles rendering
-- **`app/api/session/route.ts`**: Creates Azure AI sessions with system instructions
+- **`app/api/session/route.ts`**: Creates OpenAI Realtime sessions with system instructions
 - **`hooks/use-voice-session.ts`**: WebRTC state management
 - **`hooks/use-stock-data.ts`**: Stock data state (11 content types)
 - **`hooks/use-stock-api.ts`**: Centralized API fetch functions
@@ -1020,26 +1020,18 @@ Make sure to set these in your hosting platform:
 
 ```env
 RAPID_API_KEY=your_rapidapi_key
-OPENAI_API_KEY=your_azure_openai_key
+OPENAI_API_KEY=your_openai_key
 ```
 
-### Azure Configuration Requirements
+### OpenAI Realtime API Configuration
 
-- **Endpoint**: `voiceaistudio9329552017.openai.azure.com` (update in code if different)
-- **Region**: East US 2 (or update endpoint in code)
-- **Model**: `gpt-realtime` (or `gpt-4o-realtime-preview`)
-- **Voice**: `verse` (or choose another: alloy, echo, shimmer)
-- **API Version**: `2025-04-01-preview`
+- **Endpoint**: `api.openai.com/v1/realtime/sessions` (session creation)
+- **WebRTC Endpoint**: `api.openai.com/v1/realtime` (voice connection)
+- **Model**: `gpt-realtime` (latest GA model)
+- **Voice**: `cedar` (or choose another: alloy, ash, ballad, coral, echo, sage, shimmer, verse)
 - **Functions**: 11 AI functions automatically configured
 
-If using a different Azure resource, update the endpoint URL in `app/api/session/route.ts`:
-
-```typescript
-const response = await fetch(
-  "https://YOUR_RESOURCE.openai.azure.com/openai/realtimeapi/sessions?api-version=2025-04-01-preview",
-  // ...
-)
-```
+The application is already configured with the standard OpenAI endpoints. No additional configuration needed beyond providing your API key.
 
 ### Custom Domain Setup
 
@@ -1093,7 +1085,7 @@ This project is licensed under the MIT License.
 
 ### Acknowledgments
 
-- **Azure OpenAI** for real-time API and GPT-4 access
+- **OpenAI** for Realtime API and gpt-realtime model access
 - **RapidAPI** for Yahoo Finance API integration
 - **Vercel** for Next.js framework and hosting
 - **Shadcn** for beautiful UI components
@@ -1129,7 +1121,6 @@ This project is licensed under the MIT License.
 ### Known Limitations
 
 - Voice assistant requires modern browser with WebRTC support
-- Azure real-time API is currently in preview
 - Stock data delayed by 15 minutes (free Yahoo Finance tier)
 - Limited to US market hours awareness in AI instructions
 - Conversation history limited to last 30 messages
@@ -1155,6 +1146,6 @@ If you encounter any issues:
 
 **⭐ Star this repo if you find it useful!**
 
-Made with ❤️ using Next.js, React, and Azure OpenAI
+Made with ❤️ using Next.js, React, and OpenAI Realtime API
 
 </div>
