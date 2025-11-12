@@ -2454,13 +2454,13 @@ export default function Home() {
         <div className="flex items-center gap-3">
           <Image
             src="/portfolio_ai_logo.png"
-            alt="EY Prometheus Logo"
+            alt="  Prometheus Logo"
             width={40}
             height={40}
             className="rounded-md"
           />
           <h1 className="text-xl font-semibold text-foreground">
-            EY Prometheus
+              Prometheus
           </h1>
         </div>
 
@@ -2551,7 +2551,7 @@ export default function Home() {
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle className="text-2xl">About EY Prometheus Assistant</DialogTitle>
+                <DialogTitle className="text-2xl">About   Prometheus Assistant</DialogTitle>
                 <DialogDescription>
                   Learn what your AI-powered portfolio assistant can do
                 </DialogDescription>
@@ -2561,7 +2561,7 @@ export default function Home() {
                 <div>
                   <h3 className="text-lg font-semibold mb-2">How It Works</h3>
                   <p className="text-sm text-muted-foreground mb-2">
-                    EY Prometheus is a voice-enabled portfolio assistant powered by Azure OpenAI's real-time API. Click the microphone sphere to start a voice conversation, or use the example prompts to see what it can do.
+                      Prometheus is a voice-enabled portfolio assistant powered by Azure OpenAI's real-time API. Click the microphone sphere to start a voice conversation, or use the example prompts to see what it can do.
                   </p>
                   <p className="text-sm text-muted-foreground">
                     Get instant access to stock data from Yahoo Finance, including charts, company profiles, analyst insights, and trending tickers across global markets. All content is interactive - navigate through history, compare stocks, and click trending tickers to explore.

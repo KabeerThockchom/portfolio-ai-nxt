@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-EY Prometheus is a voice-enabled AI web application for financial insights, stock analysis, and portfolio management. It's built with Next.js 15+ (App Router) using React 19, TypeScript, and Tailwind CSS. The application integrates OpenAI's Realtime API (model: `gpt-realtime`) for voice interaction via WebRTC and fetches stock data from Yahoo Finance via RapidAPI.
+  Prometheus is a voice-enabled AI web application for financial insights, stock analysis, and portfolio management. It's built with Next.js 15+ (App Router) using React 19, TypeScript, and Tailwind CSS. The application integrates OpenAI's Realtime API (model: `gpt-realtime`) for voice interaction via WebRTC and fetches stock data from Yahoo Finance via RapidAPI.
 
 **Key Features:**
 - Real-time voice interaction with OpenAI

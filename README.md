@@ -1,4 +1,4 @@
-# 🎙️ EY Prometheus
+# 🎙️   Prometheus
 
 <div align="center">
 
@@ -35,7 +35,7 @@
 
 ## Overview
 
-EY Prometheus is a cutting-edge web application that combines voice interaction with real-time financial data analysis and portfolio management. Built with Next.js 15 and powered by OpenAI's Realtime API (gpt-realtime model), it provides an intuitive, hands-free way to explore stock markets, analyze companies, manage portfolios, and track market trends.
+  Prometheus is a cutting-edge web application that combines voice interaction with real-time financial data analysis and portfolio management. Built with Next.js 15 and powered by OpenAI's Realtime API (gpt-realtime model), it provides an intuitive, hands-free way to explore stock markets, analyze companies, manage portfolios, and track market trends.
 
 The application leverages **WebRTC** for low-latency voice streaming, **function calling** for dynamic data retrieval, and **ApexCharts** for interactive visualizations—all wrapped in a modern, responsive UI with dark/light theme support.
 

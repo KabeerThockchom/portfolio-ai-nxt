@@ -111,7 +111,7 @@ export default function StockChart({ chartData, symbol, viewMode = "price" }: St
     const textColor = isDarkMode ? "#FFFFFF" : "#333333"
     const gridColor = isDarkMode ? "#666666" : "#CCCCCC"
     const backgroundColor = isDarkMode ? "#333333" : "#FFFFFF"
-    const primaryColor = "#FFE600"  // EY Yellow
+    const primaryColor = "#FFE600"  //   Yellow
     const successColor = "#10B981"  // Keep green
     const dangerColor = "#EF4444"   // Keep red
 

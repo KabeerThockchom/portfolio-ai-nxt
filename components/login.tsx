@@ -60,14 +60,14 @@ export default function Login({ onLogin }: LoginProps) {
             <div className="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center">
               <Image
                 src="/portfolio_ai_logo.png"
-                alt="EY Prometheus Logo"
+                alt="  Prometheus Logo"
                 width={48}
                 height={48}
                 className="rounded-md"
               />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Welcome to EY Prometheus</CardTitle>
+          <CardTitle className="text-2xl font-bold">Welcome to   Prometheus</CardTitle>
           <CardDescription>
             Sign in to access your portfolio and financial insights
           </CardDescription>

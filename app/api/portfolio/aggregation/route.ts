@@ -283,7 +283,7 @@ export async function POST(request: Request) {
 
     // Define color mapping for asset classes
     const assetClassColors: Record<string, string> = {
-      "Cash": "#FFE600",      // EY Yellow for cash
+      "Cash": "#FFE600",      //   Yellow for cash
       "Stock": "#FFFFFF",     // White for stocks
       "Bond": "#999999",      // Medium gray for bonds
       "ETF": "#CCCCCC",       // Light gray for ETFs

@@ -203,12 +203,12 @@ export function DonutChart({ data, aggregationData, title, subtitle, initialDril
     },
     labels: chartData.labels,
     colors: chartData.colors || [
-      "#FFE600", // EY Yellow
+      "#FFE600", //   Yellow
       "#FFFFFF", // White
-      "#CCCCCC", // EY Light gray
-      "#999999", // EY Medium gray
+      "#CCCCCC", //   Light gray
+      "#999999", //   Medium gray
       "#666666", // Darker medium gray
-      "#333333", // EY Dark gray
+      "#333333", //   Dark gray
       "#E6E6E6", // Very light gray
       "#B3B3B3", // Light-medium gray
     ],
