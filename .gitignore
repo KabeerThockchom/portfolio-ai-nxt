@@ -27,6 +27,16 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Prevent secrets from being committed
+*.key
+*.secret
+*.pem
+*.p12
+*.pfx
+azure*
+WEBSOCKET_MIGRATION.md
+scripts/test-realtime-*.ts
+
 # Added by Claude Task Master
 # Logs
 logs
